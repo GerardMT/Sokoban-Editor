@@ -1,27 +1,38 @@
-package gmt.solver
+package gmt.solver.encoder_smt
 
 import gmt.collection.SortedMap
 import gmt.game.SokobanAction
+import gmt.game.SokobanAction.SokobanActionEnum
 import gmt.instance.{Coordinate, Instance}
 import gmt.planner.encoder.{Encoder, EncoderResult, Encoding}
-import gmt.planner.operation
-import gmt.planner.operation.{And, ClauseDeclaration, Comment, Integer, Operations, Or, Term, Type, Variable, VariableDeclaration}
+import gmt.planner.language
+import gmt.planner.language.{And, ClauseDeclaration, Comment, Integer, Operations, Or, Term, Type, Variable, VariableDeclaration}
 import gmt.planner.solver.Assignment
-import gmt.solver.SokobanEncoder.{SokobanEncodingResult, State}
+import gmt.solver.SokobanPlan
+import gmt.solver.encoder_smt.EncoderReachability.{ActionBox, EncodingData, StateReachability}
 
 import scala.collection.immutable
 import scala.collection.mutable.ListBuffer
 
-object SokobanEncoder {
+object EncoderReachability {
 
-    case class SokobanEncodingResult(states: immutable.Seq[State])
+    case class EncodingData(actions: immutable.Seq[SokobanActionEnum], states: immutable.Seq[StateReachability])
 
     case class TupleCoordinates(x: Variable, y: Variable)
 
-    class State (private val instance: Instance, val number: Int) {
+    trait VariableGenrator {
+        def getVariables: immutable.Seq[Variable]
+    }
 
-        val character: TupleCoordinates = TupleCoordinates(Variable("S" + number + "_C_X", Type.Integer), Variable("S" + number + "_C_Y", Type.Integer))
-        val boxes: immutable.Seq[TupleCoordinates] = instance.boxes.indices
+    abstract class State(private val instance: Instance, val number: Int) extends VariableGenrator {
+        val character: TupleCoordinates
+        val boxes: immutable.Seq[TupleCoordinates]
+    }
+
+    class StateReachability(private val instance: Instance, override val number: Int) extends State(instance, number) {
+
+        override val character: TupleCoordinates = TupleCoordinates(Variable("S" + number + "_C_X", Type.Integer), Variable("S" + number + "_C_Y", Type.Integer))
+        override val boxes: immutable.Seq[TupleCoordinates] = instance.boxes.indices
             .map(i => TupleCoordinates(Variable("S" + number + "_B_" + i + "_X", Type.Integer), Variable("S" + number + "_B_" + i + "Y", Type.Integer))).toVector
 
         val reachabilityNodes: SortedMap[Coordinate, Variable] = SortedMap.empty[Coordinate, Variable]
@@ -29,7 +40,7 @@ object SokobanEncoder {
         val reachabilityEdges: SortedMap[(Coordinate, Coordinate), Variable] = SortedMap.empty[(Coordinate, Coordinate), Variable]
 
         for ((c, l) <- instance.map.filter(f => f._2.isPlayableArea)) {
-            reachabilityNodes.put(c, operation.Variable("S" + number + "_RN_X" + c.x + "Y" + c.y, Type.Boolean))
+            reachabilityNodes.put(c, language.Variable("S" + number + "_RN_X" + c.x + "Y" + c.y, Type.Boolean))
             reachabilityWeights.put(c, Variable("S" + number + "RW_X" + c.x + "Y" + c.y, Type.Integer))
 
             for (shift <- SokobanAction.ACTIONS.map(f => f.shift)) {
@@ -39,55 +50,73 @@ object SokobanEncoder {
                 }
             }
         }
-        def addVariables(encoding: Encoding): Unit = {
-            encoding.add(VariableDeclaration(character.x))
-            encoding.add(VariableDeclaration(character.y))
+
+        override def getVariables: immutable.Seq[Variable] = {
+            val variables = ListBuffer.empty[Variable]
+
+            variables.append(character.x)
+            variables.append(character.y)
 
             for (b <- boxes) {
-                encoding.add(VariableDeclaration(b.x))
-                encoding.add(VariableDeclaration(b.y))
+                variables.append(b.x)
+                variables.append(b.y)
             }
+
+            variables.toList
         }
+    }
+
+    abstract class Action (val sT: StateReachability, val sTPlus: StateReachability) extends VariableGenrator {
+        val name: String = "S" + sT.number + "_S" + sTPlus.number  + "A_"  + postName
+
+        protected val postName: String
+
+        val variable = Variable(name, Type.Boolean)
+
+        def getVariables: immutable.Seq[Variable] = List(variable)
+    }
+
+    case class ActionBox(override val sT: StateReachability, override val sTPlus: StateReachability, box: Int) extends Action(sT, sTPlus) {
+
+        override protected val postName: String = box.toString
     }
 }
 
-class SokobanEncoder[A](private val instance: Instance) extends Encoder[A, SokobanEncodingResult] {
+class EncoderReachability(private val instance: Instance) extends Encoder[EncodingData, SokobanPlan] {
 
-    override def encode(timeSteps: Int): EncoderResult[SokobanEncodingResult] = {
+    override def encode(nTimeSteps: Int): EncoderResult[EncodingData] = {
         val encoding = new Encoding()
 
-        val states = (0 to timeSteps).map(f => new State(instance, f)).toVector
+        val states = (0 to nTimeSteps).map(f => new StateReachability(instance, f)).toVector
+        val timeSteps = states.zip(states).drop(1).map(s => instance.boxes.indices.map(b => ActionBox(s._1, s._2, b)))
 
-        var s0 = new State(instance, 0)
+        // TODO Add state variables and actions variables to encoding
 
-        encoding.add(reachability(s0): _*)
+        encoding.add(reachability(states.head): _*)
 
-        for ((sT, sTPlus) <- states.zip(states.tail)) {
-            encoding.add(reachability(sTPlus): _*)
+        for (s <- states.tail) {
+            encoding.add(reachability(s): _*)
+        }
 
-            val actionsVariables = ListBuffer.empty[Variable]
+        for (timeStep <- timeSteps) {
+            val actionVariables = timeStep.map(f => f.variable)
+            encoding.add(Operations.eoWithQuatradicAmmo(actionVariables): _*)
 
-            for ((b, name) <- instance.boxes.indices.map(f => (f, f.toString))) {
-                val actionVariable = Variable(prefixAction(sT, sTPlus, name), Type.Integer)
-                encoding.add(VariableDeclaration(actionVariable))
-                actionsVariables.append(actionVariable)
-
-                val ActionEncoderResult(pre, eff, terms) = boxAction(Frame(sT, sTPlus), b, name)
+            for (a <- timeStep) {
+                val ActionEncoderResult(pre, eff, terms) = boxAction(Frame(a.sT, a.sTPlus), a.box, a.name) // TODO To actionBox
                 encoding.add(terms: _*)
 
-                encoding.add(ClauseDeclaration(eff == actionVariable))
-                encoding.add(ClauseDeclaration(actionVariable -> pre))
+                encoding.add(ClauseDeclaration(eff == a.variable))
+                encoding.add(ClauseDeclaration(a.variable -> pre))
             }
-
-            encoding.add(Operations.eoWithQuatradicAmmo(actionsVariables): _*)
         }
 
         encoding.add(goal(states.last): _*)
 
-        EncoderResult(encoding, SokobanEncodingResult())
+        EncoderResult(encoding, EncodingData(timeSteps))
     }
 
-    private def reachability(state: State): immutable.Seq[Term] = {
+    private def reachability(state: StateReachability): immutable.Seq[Term] = {
         val terms = ListBuffer.empty[Term]
 
         terms.append(Comment("Reachability"))
@@ -127,8 +156,8 @@ class SokobanEncoder[A](private val instance: Instance) extends Encoder[A, Sokob
 
         val terms = ListBuffer.empty[Term]
 
-        val repetitionX = Variable(prefixAction(sT, sTPlus, name), Type.Integer)
-        val repetitionY = Variable(prefixAction(sT, sTPlus, name), Type.Integer)
+        val repetitionX = Variable(name + "_PX", Type.Integer)
+        val repetitionY = Variable(name + "_PY", Type.Integer)
 
         terms.append(ClauseDeclaration((repetitionX == Integer(0)) || repetitionY == Integer(0)))
 
@@ -149,7 +178,7 @@ class SokobanEncoder[A](private val instance: Instance) extends Encoder[A, Sokob
         ActionEncoderResult(pre, eff, terms.toList)
     }
 
-    private def goal(state: State): immutable.Seq[Term] = {
+    private def goal(state: StateReachability): immutable.Seq[Term] = {
         val terms = ListBuffer.empty[Term]
 
         for (b <- state.boxes) {
@@ -162,16 +191,8 @@ class SokobanEncoder[A](private val instance: Instance) extends Encoder[A, Sokob
         terms.toList
     }
 
-    override def decode(assignments: Seq[Assignment], encodingData: SokobanEncodingResult): A = {
+    override def decode(assignments: Seq[Assignment], encodingData: EncodingData): SokobanPlan = {
 
-    }
-
-    override def lowerBound(): Int = {
-        throw UnsupportedOperationException
-    }
-
-    override def upperBound(): Int = {
-        throw UnsupportedOperationException
     }
 
     private def existsAndPlayableArea(instance: Instance, coordinate: Coordinate): Boolean = {
@@ -183,13 +204,9 @@ class SokobanEncoder[A](private val instance: Instance) extends Encoder[A, Sokob
         }
     }
 
-    private def prefixAction(sT: State, sTPlus: State, actionName: String): String = {
-        "S" + sT.number + "_S" + sTPlus.number  + "A_" + actionName
-    }
-
     private case class ActionEncoderResult(pre: Term, post: Term, terms: immutable.Seq[Term])
 
-    private case class Frame(sT: State, sTPlus: State)
+    private case class Frame(sT: StateReachability, sTPlus: StateReachability)
 
     private case class Area(c: Coordinate, width: Int, height: Int)
 

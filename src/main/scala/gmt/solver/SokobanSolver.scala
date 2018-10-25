@@ -4,11 +4,12 @@ import gmt.instance.Instance
 import gmt.planner.planner.{Planner, PlannerOptions}
 import gmt.planner.solver.Yices2Solver
 import gmt.planner.translator.SMTLib2
+import gmt.solver.encoder_smt.EncoderReachability
 
-class Sokoban(val yicesPath: String) {
+class SokobanSolver(val yicesPath: String) {
 
     def solveSMTEncoding(instance: Instance): Unit = {
-        val encoder = new SokobanEncoder(instance)
+        val encoder = new EncoderReachability(instance)
         val translator = new SMTLib2(SMTLib2.QF_LIA)
         val solver = new Yices2Solver(yicesPath)
 
