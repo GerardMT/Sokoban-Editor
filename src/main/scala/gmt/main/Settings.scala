@@ -1,9 +1,5 @@
 package gmt.main
 
-import gmt.main.Settings.Yices2Path
-
-import scala.collection.mutable
-
 object Settings {
 
     case class NoSeparatorException(line: Int) extends Exception
