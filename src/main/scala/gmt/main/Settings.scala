@@ -10,7 +10,7 @@ object Settings {
 
     private val KEY_YICES_2_PATH = "yices2_path"
 
-    def from(string: String): Unit = {
+    def from(string: String): Settings = {
         val lines = string.split("\n").filter(f => f.head != ';').toList
 
         lines.zipWithIndex.foreach(f => {

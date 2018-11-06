@@ -1,18 +1,16 @@
 package gmt.solver
 
-import gmt.instance.Instance
+import gmt.planner.encoder.Encoder
 import gmt.planner.planner.{Planner, PlannerOptions}
 import gmt.planner.solver.Yices2Solver
 import gmt.planner.translator.SMTLib2
-import gmt.solver.encoder_smt.EncoderReachability
 
 class SokobanSolver(val yicesPath: String) {
 
-    def solveSMTEncoding(instance: Instance): Unit = {
-        val encoder = new EncoderReachability(instance)
+    def solve(encoder: Encoder[_]): Unit = {
         val translator = new SMTLib2(SMTLib2.QF_LIA)
         val solver = new Yices2Solver(yicesPath)
 
-        new Planner(PlannerOptions(None, None)).solve(encoder, translator, solver)
+        new Planner(PlannerOptions(Some(1), Some(1000))).solve(encoder, translator, solver)
     }
 }

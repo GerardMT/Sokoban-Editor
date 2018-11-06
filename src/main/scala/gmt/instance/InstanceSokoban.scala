@@ -1,13 +1,13 @@
 package gmt.instance
 
 import gmt.game.GameObject
-import gmt.game.GameObject.{BOX, CHARACTER, GOAL, GameObjectEnum}
-import gmt.instance.Instance.{BoxesGoalsDifferentException, NoBoxesException, NoGoalsException}
+import gmt.game.GameObject._
+import gmt.instance.InstanceSokoban.{BoxesGoalsDifferentException, NoBoxesException, NoGoalsException}
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.{immutable, mutable}
 
-object Instance {
+object InstanceSokoban {
 
     case class MultipleCharactersException(last: Coordinate, found: Coordinate) extends Exception
     case class NoCharacterException() extends Exception
@@ -16,33 +16,47 @@ object Instance {
     case class BoxesGoalsDifferentException() extends Exception
     case class InvalidCharacterException() extends Exception
 
-    def load(level: String): Instance = {
-        val lines = level.tail.split('\n')
+    def load(level: String): InstanceSokoban = {
 
-        var x = 0
-        var y = 0
+        val lines = level.split('\n')
+        val levelLines = lines.tail.map(f => f.toArray)
+
+        for (l <- levelLines) {
+            var i = 0
+            while (l(i) != WALL.char) {
+                l(i) = ALIGN.char
+                i += 1
+            }
+        }
 
         val map = mutable.Map.empty[Coordinate, GameObjectEnum]
 
         var characterOption: Option[Coordinate] = None
 
         val boxes = ListBuffer.empty[Coordinate]
-        val goals= ListBuffer.empty[Coordinate]
+        val goals = ListBuffer.empty[Coordinate]
 
-        for ((l, y) <- lines.tail.zipWithIndex) {
+        var width = 0
+
+        for ((l, y) <- levelLines.tail.zipWithIndex) {
+            if (l.length > width) {
+                width = l.length
+            }
+
             for ((c, x) <- l.zipWithIndex) {
                 val coordinate = Coordinate(x, y)
-                val gameObject = GameObject.getGameObjectEnum(c) match {
+                val gameObject = GameObject.fromCharacter(c) match {
                     case Some(o) =>
                         o
                     case None =>
                         throw InvalidCharacterException()
                 }
 
-                map(coordinate) = gameObject
-
                 gameObject match {
+                    case EMPTY =>
+                        map(coordinate) = gameObject
                     case CHARACTER =>
+                        map(coordinate) = gameObject
                         characterOption match {
                             case None =>
                                 characterOption = Some(coordinate)
@@ -50,9 +64,13 @@ object Instance {
                                 throw MultipleCharactersException(characterCoordinate, coordinate)
                         }
                     case BOX =>
+                        map(coordinate) = gameObject
                         boxes.append(coordinate)
                     case GOAL =>
+                        map(coordinate) = gameObject
                         goals.append(coordinate)
+                    case _ =>
+                        Unit
                 }
             }
         }
@@ -64,16 +82,22 @@ object Instance {
                 throw NoCharacterException()
         }
 
-        Instance(lines.head, map.toMap, character, boxes.toVector, goals.toVector)
+        InstanceSokoban(lines.head, width, levelLines.length, map.toMap, character, boxes.toVector, goals.toVector)
     }
 }
 
-case class Instance private (name: String,
-                             map: immutable.Map[Coordinate, GameObjectEnum],
-                             character: Coordinate,
-                             boxes: immutable.Seq[Coordinate],
-                             goals: immutable.Seq[Coordinate]) {
+case class InstanceSokoban private(name: String,
+                                   width: Int,
+                                   height: Int,
+                                   map: immutable.Map[Coordinate, GameObjectEnum],
+                                   character: Coordinate,
+                                   boxes: immutable.Seq[Coordinate],
+                                   goals: immutable.Seq[Coordinate]) {
     validate()
+
+    def this(instance: InstanceSokoban) {
+        this(instance.name, instance.width, instance.height, instance.map, instance.character, instance.boxes, instance.goals)
+    }
 
     private def validate(): Unit = {
         if (goals.isEmpty) {
@@ -86,6 +110,15 @@ case class Instance private (name: String,
 
         if (boxes.length != goals.length) {
             throw BoxesGoalsDifferentException()
+        }
+    }
+
+    def existsAndPlayableArea(coordinate: Coordinate): Boolean = {
+        map.get(coordinate) match {
+            case Some(o) =>
+                o.isPlayableArea
+            case None =>
+                false
         }
     }
 }
