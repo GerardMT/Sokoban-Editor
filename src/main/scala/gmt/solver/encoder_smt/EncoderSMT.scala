@@ -16,7 +16,7 @@ object EncoderSMT {
 
     case class Bounds(min: Coordinate, max: Coordinate, walls: immutable.Seq[Coordinate])
 
-    class InstanceSMT(private var sokoban: InstanceSokoban, bounds: Bounds) extends InstanceSokoban(sokoban)
+    class InstanceSMT(private var sokoban: InstanceSokoban, val bounds: Bounds) extends InstanceSokoban(sokoban)
 
     class StateSMT(override val number: Int, instance: InstanceSokoban) extends State(number) {
         val character: CoordinateVariable = CoordinateVariable(Variable("S" + number + "_C_X", Type.Integer), Variable("S" + number + "_C_Y", Type.Integer))
@@ -38,33 +38,44 @@ object EncoderSMT {
         }
     }
 
-    abstract class ActionSMT(val instance: InstanceSMT, override val sT: StateSMT, override val sTPlus: StateSMT) extends Action[StateSMT, SokobanActionEnum](sT, sTPlus)
-
-    def preconditionBounds[A <: ActionSMT with Repetition](action: A): immutable.Seq[Term] = {
-        val ands = ListBuffer.empty[Term]
-
-        for ((c, _) <- action.instance.map.filter(f => !f._2.isPlayableArea)) {
-            ands.append(Ite(action.repetitionX < Integer(0) || action.repetitionY < Integer(0),
-                ((Integer(c.x) < action.sT.character.x) || (Integer(c.x) > (action.sT.character.x + action.repetitionX + Integer(1)))) && ((Integer(c.y) < action.sT.character.y) || (Integer(c.y) > (action.sT.character.y + action.repetitionY + Integer(1)))),
-                ((Integer(c.x) > action.sT.character.x) || (Integer(c.x) < (action.sT.character.x - action.repetitionX - Integer(1)))) && ((Integer(c.y) > action.sT.character.y) || (Integer(c.y) < (action.sT.character.y - action.repetitionY - Integer(1))))))
-        }
-
-        ands.toList
-    }
+    abstract class ActionSMT(val instanceSMT: InstanceSMT, override val sT: StateSMT, override val sTPlus: StateSMT) extends Action[StateSMT, SokobanActionEnum](sT, sTPlus)
 }
 
 abstract class EncoderSMT[S <: StateSMT](val instance: InstanceSokoban) extends ClassicPlanner[S, InstanceSokoban, SokobanActionEnum] {
 
     protected val instanceSMT = new InstanceSMT(instance, getBounds)
 
-    override def goal(state: S): immutable.Seq[Term] = {
+    override def encodeTimeStep(timeStep: ClassicPlanner.TimeStep[S, SokobanActionEnum]): immutable.Seq[Term] = {
+        List(timeStep.sT.character.x > Integer(instanceSMT.bounds.min.x),
+            timeStep.sT.character.y > Integer(instanceSMT.bounds.min.y),
+            timeStep.sT.character.x < Integer(instanceSMT.bounds.max.x),
+            timeStep.sT.character.y < Integer(instanceSMT.bounds.max.y))
+    }
+
+
+    override def encodeInitialState(state: S): immutable.Seq[Term] = {
+        val terms = ListBuffer.empty[Term]
+
+        terms.append(ClauseDeclaration(state.character.x == Integer(instance.character.x)))
+        terms.append(ClauseDeclaration(state.character.y == Integer(instance.character.y)))
+
+        for (b <- instance.boxes.indices) {
+            terms.append(ClauseDeclaration(state.boxes(b).x == Integer(instance.boxes(b).x)))
+            terms.append(ClauseDeclaration(state.boxes(b).y == Integer(instance.boxes(b).y)))
+        }
+
+        terms.toList
+    }
+
+    override def encodeGoal(state: S): immutable.Seq[Term] = {
         val terms = ListBuffer.empty[Term]
 
         for (b <- state.boxes) {
-            val or = Or((for (g <- instance.goals) yield {
+            val or = for (g <- instance.goals) yield {
                 (b.x == Integer(g.x)) && (b.y == Integer(g.y))
-            }): _*)
-            terms.append(ClauseDeclaration(or))
+            }
+
+            terms.append(ClauseDeclaration(Operations.multipleTermsApply(or, Or.FUNCTION_MULTIPLE)))
         }
 
         terms.toList

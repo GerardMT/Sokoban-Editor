@@ -11,8 +11,8 @@ import scala.collection.mutable.ListBuffer
 
 class Repetition(private val preName: String) extends VariableGenerator {
 
-    val repetitionX = Variable(preName + "_PX", Type.Integer)
-    val repetitionY = Variable(preName + "_PY", Type.Integer)
+    val repetitionX = Variable(preName + "_RX", Type.Integer)
+    val repetitionY = Variable(preName + "_RY", Type.Integer)
 
     def encode(): immutable.Seq[Term] = {
         val terms = ListBuffer.empty[Term]

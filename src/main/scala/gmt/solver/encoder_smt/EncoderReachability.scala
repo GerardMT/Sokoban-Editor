@@ -55,7 +55,7 @@ object EncoderReachability {
             ands.appendAll(super.preconditions())
 
             for ((c, rn) <- sT.reachabilityNodes) {
-                ands.append((sT.character.x == Integer(c.x) && sT.character.y == Integer(c.y)) -> rn)
+                ands.append((sT.character.x == Integer(c.x) && sT.character.y == Integer(c.y)) ==> rn)
             }
 
             ands.toList
@@ -120,7 +120,7 @@ class EncoderReachability(override val instance: InstanceSokoban) extends Encode
                 (state.boxes(b).x == Integer(c.x)) && (state.boxes(b).y == Integer(c.y))
             }): _*)
 
-            terms.append(ClauseDeclaration(or -> !state.reachabilityNodes.get(c).get))
+            terms.append(ClauseDeclaration(or ==> !state.reachabilityNodes.get(c).get))
         }
 
         for ((c, _) <- instance.map.filter(f => f._2.isPlayableArea)) {
@@ -134,12 +134,12 @@ class EncoderReachability(override val instance: InstanceSokoban) extends Encode
 
                 ors.append(edgeInverse)
 
-                terms.append(ClauseDeclaration(edgeInverse -> state.reachabilityNodes.get(end).get))
-                terms.append(ClauseDeclaration(edgeInverse -> (state.reachabilityWeights.get(end).get < state.reachabilityWeights.get(c).get)))
+                terms.append(ClauseDeclaration(edgeInverse ==> state.reachabilityNodes.get(end).get))
+                terms.append(ClauseDeclaration(edgeInverse ==> (state.reachabilityWeights.get(end).get < state.reachabilityWeights.get(c).get)))
             }
 
             if (ors.nonEmpty) {
-                terms.append(ClauseDeclaration(((!(state.character.x == Integer(c.x)) || !(state.character.y == Integer(c.y))) && nodeStart) -> Operations.singleTermRemoveOr(Or(ors: _*))))
+                terms.append(ClauseDeclaration(((!(state.character.x == Integer(c.x)) || !(state.character.y == Integer(c.y))) && nodeStart) ==> Operations.multipleTermsApply(ors.toList, Or.FUNCTION_MULTIPLE)))
             }
         }
 

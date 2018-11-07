@@ -7,4 +7,4 @@ lazy val sokoban_editor = (project in file("."))
     .aggregate(planner)
     .dependsOn(planner)
 
-lazy val planner = RootProject(file("../planner/"))
+lazy val planner = RootProject(file("../../planner/"))

@@ -38,7 +38,7 @@ object InstanceSokoban {
 
         var width = 0
 
-        for ((l, y) <- levelLines.tail.zipWithIndex) {
+        for ((l, y) <- levelLines.zipWithIndex) {
             if (l.length > width) {
                 width = l.length
             }
@@ -53,7 +53,7 @@ object InstanceSokoban {
                 }
 
                 gameObject match {
-                    case EMPTY =>
+                    case EMPTY | WALL =>
                         map(coordinate) = gameObject
                     case CHARACTER =>
                         map(coordinate) = gameObject

@@ -1,15 +1,19 @@
 package gmt.terminal
 
-import java.io.File
-
 import gmt.instance.InstanceSokoban
 import gmt.main.Settings
-import gmt.solver.SokobanSolver
+import gmt.planner.fixedPlanner.FixedPlannerResult.FixedPlannerResult
+import gmt.planner.planner.Planner.UpdateListener
 import gmt.solver.encoder_smt.{EncoderBasic, EncoderReachability}
+import gmt.solver.{SokobanSolver, SolvedSokobanPlan, UnsolvedSokobanPlan}
 
 import scala.io.Source
 
-object Main {
+object Main extends UpdateListener {
+
+    def updated(fixedPlannerResult: FixedPlannerResult): Unit = {
+        println(fixedPlannerResult)
+    }
 
     def main(args: Array[String]): Unit = {
         val settingsPath = System.getProperty("user.dir") + "/config"
@@ -25,14 +29,23 @@ object Main {
 
         val sokobanSolver = new SokobanSolver(yices2Path)
 
-        args.toList match {
+        val result = args.toList match {
             case List("smt_basic", instancePath) =>
-                sokobanSolver.solve(new EncoderBasic(loadInstance(instancePath)))
+                sokobanSolver.solve(new EncoderBasic(loadInstance(instancePath)), this)
             case List("smt_reachability", instancePath) =>
-                sokobanSolver.solve(new EncoderReachability(loadInstance(instancePath)))
+                sokobanSolver.solve(new EncoderReachability(loadInstance(instancePath)), this)
             case _ =>
                 System.out.println("Unknown arguments")
                 sys.exit(0)
+        }
+
+        print("\n")
+
+        result match {
+            case SolvedSokobanPlan(plan, _) =>
+                println(plan.map(f => f + "\n").mkString)
+            case UnsolvedSokobanPlan() =>
+                println("Unsolved")
         }
     }
 
