@@ -8,8 +8,8 @@ import gmt.planner.language
 import gmt.planner.language._
 import gmt.planner.planner.ClassicPlanner._
 import gmt.planner.solver.value.{Value, ValueInteger}
-import gmt.solver.encoder_smt.EncoderBasic.BoxActionBasic
-import gmt.solver.encoder_smt.EncoderReachability.{BoxActionReachability, StateReachability}
+import gmt.solver.encoder_smt.EncoderBasic.UpBoxActionBasic
+import gmt.solver.encoder_smt.EncoderReachability.{StateReachability, UpBoxActionReachability}
 import gmt.solver.encoder_smt.EncoderSMT.{InstanceSMT, StateSMT}
 import gmt.solver.{CoordinateVariable, PlanInvalidException}
 import gmt.util.AStar
@@ -47,18 +47,18 @@ object EncoderReachability {
         }
     }
 
-    class BoxActionReachability(instance: InstanceSMT, override val sT: StateReachability, override val sTPlus: StateSMT, override val box: Int) extends BoxActionBasic(instance, sT, sTPlus, box) with RepetitionInterface {
+    class UpBoxActionReachability(instance: InstanceSMT, override val sT: StateReachability, override val sTPlus: StateSMT, override val box: Int) extends UpBoxActionBasic(instance, sT, sTPlus, box) with RepetitionInterface {
 
         override protected def preconditions(): immutable.Seq[Term] = {
-            val ands = ListBuffer.empty[Term]
+            val pres = ListBuffer.empty[Term]
 
-            ands.appendAll(super.preconditions())
+            pres.appendAll(super.preconditions())
 
             for ((c, rn) <- sT.reachabilityNodes) {
-                ands.append((sT.character.x == Integer(c.x) && sT.character.y == Integer(c.y)) ==> rn)
+                pres.append((sT.character.x == Integer(c.x) && sT.character.y == Integer(c.y)) ==> rn)
             }
 
-            ands.toList
+            pres.toList
         }
 
         override def decode(assignments: immutable.Map[String, Value]): immutable.Seq[SokobanActionEnum] = {
@@ -83,7 +83,7 @@ object EncoderReachability {
                 actions.appendAll(path.map(f => SokobanAction.fromShift(f).get))
             }
 
-            actions.appendAll(repetition.toSokobanActions(assignments))
+            //actions.appendAll(repetitionModule.decode(assignments)) // TODO
 
             actions.toList
         }
@@ -101,7 +101,7 @@ class EncoderReachability(override val instance: InstanceSokoban) extends Encode
     }
 
     override def createActions(sT: StateReachability, sTPlus: StateReachability): immutable.Seq[Action[StateReachability, SokobanActionEnum]] = {
-        instance.boxes.indices.map(b => new BoxActionReachability(instanceSMT, sT, sTPlus, b).asInstanceOf[Action[StateReachability, SokobanActionEnum]])
+        instance.boxes.indices.map(b => new UpBoxActionReachability(instanceSMT, sT, sTPlus, b).asInstanceOf[Action[StateReachability, SokobanActionEnum]])
     }
 
     override def encodeInitialState(state: StateReachability): immutable.Seq[Term] = {

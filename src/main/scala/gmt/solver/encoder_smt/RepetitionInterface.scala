@@ -4,6 +4,5 @@ import gmt.planner.language.Variable
 
 trait RepetitionInterface {
 
-    val repetitionX: Variable
-    val repetitionY: Variable
+    val repetition: Variable
 }

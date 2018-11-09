@@ -14,6 +14,5 @@ object SokobanAction {
     case object UP extends SokobanActionEnum(Coordinate(+0, -1))
     case object DOWN extends SokobanActionEnum(Coordinate(+0, +1))
 
-
     def fromShift(shit: Coordinate): Option[SokobanActionEnum] = shitMap.get(shit)
 }

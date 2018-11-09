@@ -14,7 +14,7 @@ class SokobanSolver(val yicesPath: String) {
         val translator = new SMTLib2(SMTLib2.QF_LIA)
         val solver = new Yices2Solver(yicesPath)
 
-        val planner = new Planner(PlannerOptions(Some(1), Some(1)), encoder, translator, solver)
+        val planner = new Planner(PlannerOptions(Some(1), Some(1000)), encoder, translator, solver)
         planner.updateListener = Some(updateListener)
 
         val result = planner.solve()
