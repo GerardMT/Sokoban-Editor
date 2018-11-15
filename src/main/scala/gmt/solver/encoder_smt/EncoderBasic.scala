@@ -16,15 +16,15 @@ object EncoderBasic {
 
     abstract class CharacterAction(override val instanceSMT: InstanceSMT, override val sT: StateSMT, override val sTPlus: StateSMT) extends ActionSMT(instanceSMT, sT, sTPlus) with RepetitionInterface {
 
-        override def postName: String = "CA"
-
         val repetitionModule = new Repetition(name)
 
         override val repetition: Variable = repetitionModule.repetition
 
         protected val direction: Coordinate
 
-        override protected def terms(): immutable.Seq[Term] = Nil
+        protected def terms(): immutable.Seq[Term] = {
+            List(ClauseDeclaration(repetition > Integer(0)))
+        }
 
         protected def effects(): immutable.Seq[Term] = {
             val effects = ListBuffer.empty[Term]
@@ -49,13 +49,19 @@ object EncoderBasic {
 
     case class UpCharacterAction(override val instanceSMT: InstanceSMT, override val sT: StateSMT, override val sTPlus: StateSMT) extends CharacterAction(instanceSMT, sT, sTPlus) {
 
+        override def postName: String = "C_U"
+
         override protected val direction: Coordinate = SokobanAction.UP.shift
 
         override protected def preconditions(): immutable.Seq[Term] = {
             val pres = ListBuffer.empty[Term]
 
             for (b <- sT.boxes) {
-                pres.append(Or(b.x != sT.character.x, b.y > sT.character.y, b.y < sT.character.y + repetition))
+                pres.append(Or(b.x != sT.character.x, b.y > sT.character.y, b.y < sT.character.y - repetition))
+            }
+
+            for (c <- instanceSMT.bounds.walls) {
+                pres.append(Or(Integer(c.x) != sT.character.x, Integer(c.y) > sT.character.y, Integer(c.y) < sT.character.y - repetition))
             }
 
             pres.toList
@@ -73,7 +79,101 @@ object EncoderBasic {
         }
     }
 
-    // TODO 4 Actions
+    case class DownCharacterAction(override val instanceSMT: InstanceSMT, override val sT: StateSMT, override val sTPlus: StateSMT) extends CharacterAction(instanceSMT, sT, sTPlus) {
+
+        override def postName: String = "C_D"
+
+        override protected val direction: Coordinate = SokobanAction.DOWN.shift
+
+        override protected def preconditions(): immutable.Seq[Term] = {
+            val pres = ListBuffer.empty[Term]
+
+            for (b <- sT.boxes) {
+                pres.append(Or(b.x != sT.character.x, b.y < sT.character.y, b.y > sT.character.y + repetition))
+            }
+
+            for (c <- instanceSMT.bounds.walls) {
+                pres.append(Or(Integer(c.x) != sT.character.x, Integer(c.y) < sT.character.y, Integer(c.y) > sT.character.y + repetition))
+            }
+
+            pres.toList
+        }
+
+        override protected def effects(): immutable.Seq[Term] = {
+            val effs = ListBuffer.empty[Term]
+
+            effs.appendAll(super.effects())
+
+            effs.append(sTPlus.character.x == sT.character.x)
+            effs.append(sTPlus.character.y == sT.character.y + repetition)
+
+            effs.toList
+        }
+    }
+
+    case class RightCharacterAction(override val instanceSMT: InstanceSMT, override val sT: StateSMT, override val sTPlus: StateSMT) extends CharacterAction(instanceSMT, sT, sTPlus) {
+
+        override def postName: String = "C_R"
+
+        override protected val direction: Coordinate = SokobanAction.RIGHT.shift
+
+        override protected def preconditions(): immutable.Seq[Term] = {
+            val pres = ListBuffer.empty[Term]
+
+            for (b <- sT.boxes) {
+                pres.append(Or(b.y != sT.character.y, b.x < sT.character.x, b.x > sT.character.x + repetition))
+            }
+
+            for (c <- instanceSMT.bounds.walls) {
+                pres.append(Or(Integer(c.y) != sT.character.y, Integer(c.x) < sT.character.x, Integer(c.x) > sT.character.x + repetition))
+            }
+
+            pres.toList
+        }
+
+        override protected def effects(): immutable.Seq[Term] = {
+            val effs = ListBuffer.empty[Term]
+
+            effs.appendAll(super.effects())
+
+            effs.append(sTPlus.character.x == sT.character.x + repetition)
+            effs.append(sTPlus.character.y == sT.character.y)
+
+            effs.toList
+        }
+    }
+
+    case class LeftCharacterAction(override val instanceSMT: InstanceSMT, override val sT: StateSMT, override val sTPlus: StateSMT) extends CharacterAction(instanceSMT, sT, sTPlus) {
+
+        override def postName: String = "C_L"
+
+        override protected val direction: Coordinate = SokobanAction.LEFT.shift
+
+        override protected def preconditions(): immutable.Seq[Term] = {
+            val pres = ListBuffer.empty[Term]
+
+            for (b <- sT.boxes) {
+                pres.append(Or(b.y != sT.character.y, b.x > sT.character.x, b.x < sT.character.x - repetition))
+            }
+
+            for (c <- instanceSMT.bounds.walls) {
+                pres.append(Or(Integer(c.y) != sT.character.y, Integer(c.x) > sT.character.x, Integer(c.x) < sT.character.x - repetition))
+            }
+
+            pres.toList
+        }
+
+        override protected def effects(): immutable.Seq[Term] = {
+            val effs = ListBuffer.empty[Term]
+
+            effs.appendAll(super.effects())
+
+            effs.append(sTPlus.character.x == sT.character.x - repetition)
+            effs.append(sTPlus.character.y == sT.character.y)
+
+            effs.toList
+        }
+    }
 
     abstract class BoxActionBasic(override val instanceSMT: InstanceSMT, override val sT: StateSMT, override val sTPlus: StateSMT, val box: Int) extends ActionSMT(instanceSMT, sT, sTPlus) with RepetitionInterface {
 
@@ -81,7 +181,9 @@ object EncoderBasic {
 
         override val repetition: Variable = repetitionModule.repetition
 
-        override protected def terms(): immutable.Seq[Term] = Nil
+        protected def terms(): immutable.Seq[Term] = {
+            List(ClauseDeclaration(repetition > Integer(0)))
+        }
 
         protected val direction: Coordinate
 
@@ -116,13 +218,14 @@ object EncoderBasic {
             val pres = ListBuffer.empty[Term]
 
             for (b <- sT.boxes.patch(box, Nil, 1)) {
-                pres.append(Or(b.x != sT.character.x, b.y > sT.character.y, b.y < sT.boxes(box).y + repetition))
+                pres.append(Or(b.x != sT.character.x, b.y > sT.character.y, b.y < sT.boxes(box).y - repetition))
             }
 
             for (c <- instanceSMT.bounds.walls) {
-                pres.append(Or(Integer(c.x) != sT.character.x, Integer(c.y) > sT.character.y, Integer(c.y) < sT.boxes(box).y + repetition))
+                pres.append(Or(Integer(c.x) != sT.character.x, Integer(c.y) > sT.character.y, Integer(c.y) < sT.boxes(box).y - repetition))
             }
 
+            pres.append(sT.boxes(box).x == sT.character.x)
             pres.append(sT.boxes(box).y == sT.character.y - Integer(1))
 
             pres.toList
@@ -154,13 +257,14 @@ object EncoderBasic {
             val pres = ListBuffer.empty[Term]
 
             for (b <- sT.boxes.patch(box, Nil, 1)) {
-                pres.append(Or(b.x != sT.character.x, b.y < sT.character.y, b.y > sT.boxes(box).y - repetition))
+                pres.append(Or(b.x != sT.character.x, b.y < sT.character.y, b.y > sT.boxes(box).y + repetition))
             }
 
             for (c <- instanceSMT.bounds.walls) {
-                pres.append(Or(Integer(c.x) != sT.character.x, Integer(c.y) < sT.character.y, Integer(c.y) > sT.boxes(box).y - repetition))
+                pres.append(Or(Integer(c.x) != sT.character.x, Integer(c.y) < sT.character.y, Integer(c.y) > sT.boxes(box).y + repetition))
             }
 
+            pres.append(sT.boxes(box).x == sT.character.x)
             pres.append(sT.boxes(box).y == sT.character.y + Integer(1))
 
             pres.toList
@@ -191,51 +295,15 @@ object EncoderBasic {
             val pres = ListBuffer.empty[Term]
 
             for (b <- sT.boxes.patch(box, Nil, 1)) {
-                pres.append(Or(b.y != sT.character.y, b.x > sT.character.x, b.x < sT.boxes(box).x + repetition))
+                pres.append(Or(b.y != sT.character.y, b.x < sT.character.x, b.x > sT.boxes(box).x + repetition))
             }
 
             for (c <- instanceSMT.bounds.walls) {
-                pres.append(Or(Integer(c.y) != sT.character.y, Integer(c.x) > sT.character.x, Integer(c.x) < sT.boxes(box).x + repetition))
+                pres.append(Or(Integer(c.y) != sT.character.y, Integer(c.x) < sT.character.x, Integer(c.x) > sT.boxes(box).x + repetition))
             }
 
             pres.append(sT.boxes(box).x == sT.character.x + Integer(1))
-
-            pres.toList
-        }
-
-        override protected def effects(): immutable.Seq[Term] = {
-            val effs = ListBuffer.empty[Term]
-
-            effs.appendAll(super.effects())
-
-            effs.append(sTPlus.boxes(box).x == sT.boxes(box).x - repetition)
-            effs.append(sTPlus.boxes(box).y == sT.boxes(box).y)
-
-            effs.append(sTPlus.character.x == sT.character.x - repetition)
-            effs.append(sTPlus.character.y == sT.character.y)
-
-            effs.toList
-        }
-    }
-
-    case class LeftBoxActionBasic(override val instanceSMT: InstanceSMT, override val sT: StateSMT, override val sTPlus: StateSMT, override val box: Int) extends BoxActionBasic(instanceSMT, sT, sTPlus, box){
-
-        override def postName: String = "B" + box.toString + "_L"
-
-        override val direction = SokobanAction.LEFT.shift
-
-        protected def preconditions():immutable.Seq[Term] = {
-            val pres = ListBuffer.empty[Term]
-
-            for (b <- sT.boxes.patch(box, Nil, 1)) {
-                pres.append(Or(b.y != sT.character.y, b.x < sT.character.x, b.x > sT.boxes(box).x - repetition))
-            }
-
-            for (c <- instanceSMT.bounds.walls) {
-                pres.append(Or(Integer(c.y) != sT.character.y, Integer(c.x) < sT.character.x, Integer(c.x) > sT.boxes(box).x - repetition))
-            }
-
-            pres.append(sT.boxes(box).x == sT.character.x - Integer(1))
+            pres.append(sT.boxes(box).y == sT.character.y)
 
             pres.toList
         }
@@ -254,6 +322,44 @@ object EncoderBasic {
             effs.toList
         }
     }
+
+    case class LeftBoxActionBasic(override val instanceSMT: InstanceSMT, override val sT: StateSMT, override val sTPlus: StateSMT, override val box: Int) extends BoxActionBasic(instanceSMT, sT, sTPlus, box){
+
+        override def postName: String = "B" + box.toString + "_L"
+
+        override val direction = SokobanAction.LEFT.shift
+
+        protected def preconditions():immutable.Seq[Term] = {
+            val pres = ListBuffer.empty[Term]
+
+            for (b <- sT.boxes.patch(box, Nil, 1)) {
+                pres.append(Or(b.y != sT.character.y, b.x > sT.character.x, b.x < sT.boxes(box).x - repetition))
+            }
+
+            for (c <- instanceSMT.bounds.walls) {
+                pres.append(Or(Integer(c.y) != sT.character.y, Integer(c.x) > sT.character.x, Integer(c.x) < sT.boxes(box).x - repetition))
+            }
+
+            pres.append(sT.boxes(box).x == sT.character.x - Integer(1))
+            pres.append(sT.boxes(box).y == sT.character.y)
+
+            pres.toList
+        }
+
+        override protected def effects(): immutable.Seq[Term] = {
+            val effs = ListBuffer.empty[Term]
+
+            effs.appendAll(super.effects())
+
+            effs.append(sTPlus.boxes(box).x == sT.boxes(box).x - repetition)
+            effs.append(sTPlus.boxes(box).y == sT.boxes(box).y)
+
+            effs.append(sTPlus.character.x == sT.character.x - repetition)
+            effs.append(sTPlus.character.y == sT.character.y)
+
+            effs.toList
+        }
+    }
 }
 
 class EncoderBasic(override val instance: InstanceSokoban) extends EncoderSMT[StateSMT](instance) {
@@ -261,9 +367,8 @@ class EncoderBasic(override val instance: InstanceSokoban) extends EncoderSMT[St
     override def createState(number: Int): StateSMT = new StateSMT(number, instance)
 
     override def createActions(sT: StateSMT, sTPlus: StateSMT): immutable.Seq[Action[StateSMT, SokobanActionEnum]] = {
-//        List(UpCharacterAction(instanceSMT, sT, sTPlus), DownCharacterAction(instanceSMT, sT, sTPlus), RightCharacterAction(instanceSMT, sT, sTPlus), LeftCharacterAction(instanceSMT, sT, sTPlus)) ++
-        List(UpCharacterAction(instanceSMT, sT, sTPlus)) ++
-        instance.boxes.indices.flatMap(b => List(UpBoxActionBasic(instanceSMT, sT, sTPlus, b), DownBoxActionBasic(instanceSMT, sT, sTPlus, b), RightBoxActionBasic(instanceSMT, sT, sTPlus, b), LeftBoxActionBasic(instanceSMT, sT, sTPlus, b)))
+        List(UpCharacterAction(instanceSMT, sT, sTPlus), DownCharacterAction(instanceSMT, sT, sTPlus), RightCharacterAction(instanceSMT, sT, sTPlus), LeftCharacterAction(instanceSMT, sT, sTPlus)) ++
+            instance.boxes.indices.flatMap(b => List(UpBoxActionBasic(instanceSMT, sT, sTPlus, b), DownBoxActionBasic(instanceSMT, sT, sTPlus, b), RightBoxActionBasic(instanceSMT, sT, sTPlus, b), LeftBoxActionBasic(instanceSMT, sT, sTPlus, b)))
     }
 
     override def encodeTimeStep(timeStep: TimeStep[StateSMT, SokobanActionEnum]): immutable.Seq[Term] = Nil

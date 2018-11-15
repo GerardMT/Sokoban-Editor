@@ -21,7 +21,7 @@ object EncoderSMT {
     class StateSMT(override val number: Int, instance: InstanceSokoban) extends State(number) {
         val character: CoordinateVariable = CoordinateVariable(Variable("S" + number + "_C_X", Type.Integer), Variable("S" + number + "_C_Y", Type.Integer))
         val boxes: immutable.Seq[CoordinateVariable] = instance.boxes.indices
-            .map(i => CoordinateVariable(Variable("S" + number + "_B_" + i + "_X", Type.Integer), Variable("S" + number + "_B_" + i + "Y", Type.Integer))).toVector
+            .map(i => CoordinateVariable(Variable("S" + number + "_B_" + i + "_X", Type.Integer), Variable("S" + number + "_B_" + i + "_Y", Type.Integer))).toVector
 
         override def getVariables: immutable.Seq[Variable] = {
             val variables = ListBuffer.empty[Variable]
@@ -45,7 +45,7 @@ abstract class EncoderSMT[S <: StateSMT](val instance: InstanceSokoban) extends 
 
     protected val instanceSMT = new InstanceSMT(instance, getBounds)
 
-    override def encodeTimeStep(timeStep: ClassicPlanner.TimeStep[S, SokobanActionEnum]): immutable.Seq[Term] = {
+    def encodeTimeStep(timeStep: ClassicPlanner.TimeStep[S, SokobanActionEnum]): immutable.Seq[Term] = {
         List(timeStep.sT.character.x > Integer(instanceSMT.bounds.min.x),
             timeStep.sT.character.y > Integer(instanceSMT.bounds.min.y),
             timeStep.sT.character.x < Integer(instanceSMT.bounds.max.x),
@@ -53,7 +53,7 @@ abstract class EncoderSMT[S <: StateSMT](val instance: InstanceSokoban) extends 
     }
 
 
-    override def encodeInitialState(state: S): immutable.Seq[Term] = {
+    def encodeInitialState(state: S): immutable.Seq[Term] = {
         val terms = ListBuffer.empty[Term]
 
         terms.append(ClauseDeclaration(state.character.x == Integer(instance.character.x)))
@@ -67,7 +67,7 @@ abstract class EncoderSMT[S <: StateSMT](val instance: InstanceSokoban) extends 
         terms.toList
     }
 
-    override def encodeGoal(state: S): immutable.Seq[Term] = {
+    def encodeGoal(state: S): immutable.Seq[Term] = {
         val terms = ListBuffer.empty[Term]
 
         for (b <- state.boxes) {
@@ -81,11 +81,11 @@ abstract class EncoderSMT[S <: StateSMT](val instance: InstanceSokoban) extends 
         terms.toList
     }
 
-    override def lowerBound(): Int = {
+    def lowerBound(): Int = {
         throw new UnsupportedOperationException()
     }
 
-    override def upperBound(): Int = {
+    def upperBound(): Int = {
         throw new UnsupportedOperationException()
     }
 

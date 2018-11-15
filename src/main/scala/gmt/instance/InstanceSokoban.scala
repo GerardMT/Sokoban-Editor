@@ -69,6 +69,10 @@ object InstanceSokoban {
                     case GOAL =>
                         map(coordinate) = gameObject
                         goals.append(coordinate)
+                    case GOAL_BOX =>
+                        map(coordinate) = gameObject
+                        boxes.append(coordinate)
+                        goals.append(coordinate)
                     case _ =>
                         Unit
                 }
