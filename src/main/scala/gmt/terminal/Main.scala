@@ -16,6 +16,8 @@ object Main extends UpdateListener {
     }
 
     def main(args: Array[String]): Unit = {
+        val startTime = System.currentTimeMillis()
+
         val settingsPath = System.getProperty("user.dir") + "/config"
         val settings = Settings.from(Source.fromFile(settingsPath).getLines.mkString)
 
@@ -47,6 +49,8 @@ object Main extends UpdateListener {
             case UnsolvedSokobanPlan() =>
                 println("Unsolved")
         }
+
+        println("time=" + (System.currentTimeMillis() - startTime) / 1000.0)
     }
 
     private def loadInstance(instancePath: String): InstanceSokoban = {

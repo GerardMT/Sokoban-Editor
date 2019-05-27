@@ -45,11 +45,11 @@ abstract class EncoderSMT[S <: StateSMT](val instance: InstanceSokoban) extends 
 
     protected val instanceSMT = new InstanceSMT(instance, getBounds)
 
-    def encodeTimeStep(timeStep: ClassicPlanner.TimeStep[S, SokobanActionEnum]): immutable.Seq[Term] = {
-        List(timeStep.sT.character.x > Integer(instanceSMT.bounds.min.x),
-            timeStep.sT.character.y > Integer(instanceSMT.bounds.min.y),
-            timeStep.sT.character.x < Integer(instanceSMT.bounds.max.x),
-            timeStep.sT.character.y < Integer(instanceSMT.bounds.max.y))
+    def encodeOtherStates(timeStep: ClassicPlanner.TimeStep[S, SokobanActionEnum]): immutable.Seq[Term] = {
+        List(ClauseDeclaration(timeStep.sT.character.x > Integer(instanceSMT.bounds.min.x)),
+            ClauseDeclaration(timeStep.sT.character.y > Integer(instanceSMT.bounds.min.y)),
+            ClauseDeclaration(timeStep.sT.character.x < Integer(instanceSMT.bounds.max.x)),
+            ClauseDeclaration(timeStep.sT.character.y < Integer(instanceSMT.bounds.max.y)))
     }
 
 
