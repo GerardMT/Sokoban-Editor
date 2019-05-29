@@ -15,11 +15,17 @@ object Main extends UpdateListener {
         println(fixedPlannerResult)
     }
 
+    def getSettings() = {
+        val settingsPath = System.getProperty("user.dir") + "/config"
+        val source = Source.fromFile(settingsPath)
+        val lines = try source.mkString finally source.close()
+        Settings.from(lines)
+    }
+
     def main(args: Array[String]): Unit = {
         val startTime = System.currentTimeMillis()
 
-        val settingsPath = System.getProperty("user.dir") + "/config"
-        val settings = Settings.from(Source.fromFile(settingsPath).getLines.mkString)
+        val settings = getSettings()
 
         val yices2Path = settings.yices2Path match {
             case Some(s) =>

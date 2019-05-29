@@ -6,6 +6,7 @@ import gmt.game.SokobanAction.SokobanActionEnum
 import gmt.instance.{Coordinate, InstanceSokoban}
 import gmt.planner.language
 import gmt.planner.language._
+import gmt.planner.language.Integer.ImplicitConstructor
 import gmt.planner.planner.ClassicPlanner._
 import gmt.planner.solver.value.{Value, ValueInteger}
 import gmt.solver.encoder_smt.EncoderBasic.BoxActionBasic
@@ -55,8 +56,22 @@ object EncoderReachability {
             pres.appendAll(super.preconditionWallsBetween())
             pres.appendAll(super.preconditionBoxesBetween())
 
-            for ((c, rn) <- sT.reachabilityNodes) {
-                pres.append((sT.character.x == Integer(c.x) && sT.character.y == Integer(c.y)) ==> rn)
+            for ((c, rn) <- sT.reachabilityNodes.filter(f => instance.existsAndPlayableArea(f._1 + direction))) {
+                direction match {
+                    case SokobanAction.UP.shift =>
+                        pres.append(((sT.boxes(box).x == Integer(c.x)) && (sT.boxes(box).y == Integer(c.y - 1))) ==> rn)
+
+                    case SokobanAction.DOWN.shift =>
+                        pres.append(((sT.boxes(box).x == Integer(c.x)) && (sT.boxes(box).y == Integer(c.y + 1))) ==> rn)
+
+                    case SokobanAction.RIGHT.shift =>
+                        pres.append(((sT.boxes(box).x == Integer(c.x + 1)) && (sT.boxes(box).y == Integer(c.y))) ==> rn)
+
+                    case SokobanAction.LEFT.shift =>
+                        pres.append(((sT.boxes(box).x == Integer(c.x - 1)) && (sT.boxes(box).y == Integer(c.y))) ==> rn)
+
+                    case _ =>
+                }
             }
 
             pres.toList
@@ -65,15 +80,19 @@ object EncoderReachability {
         override def decode(assignments: immutable.Map[String, Value]): immutable.Seq[SokobanActionEnum] = {
             val actions = ListBuffer.empty[SokobanActionEnum]
 
-            val sTCharacterFrom = coordinateFromCoordinateVariable(sT.character, assignments)
-            val sTCharacterTo = coordinateFromCoordinateVariable(sT.boxes(box), assignments) - direction
+            val sTCharacterFrom = sT.coordinateFromCoordinateVariable(sT.character, assignments)
+            val sTCharacterTo = sT.coordinateFromCoordinateVariable(sT.boxes(box), assignments) - direction
 
             if (sTCharacterFrom.manhattanDistance(sTCharacterTo) >= 1) {
-                val allNodes = () => instance.map.filter(f => f._2.isPlayableArea).keys.toList
+                val allNodes = () => instance.map.filter(f => f._2.isPlayableArea).keys
+                    .filter(c => !sT.boxes.exists(b => sT.coordinateFromCoordinateVariable(b, assignments) == c))
+                    .toList
 
-                val neighbours = (c: Coordinate) => SokobanAction.VALUES.map(a => c + a.shift).filter(c => instance.existsAndPlayableArea(c))
-                val heuristic = (start: Coordinate, goal: Coordinate) => start.euclideanDistance(goal).toFloat
+                val neighbours = (c: Coordinate) => SokobanAction.VALUES.map(a => c + a.shift)
+                    .filter(c => instance.existsAndPlayableArea(c))
+                    .filter(c => !sT.boxes.exists(b => sT.coordinateFromCoordinateVariable(b, assignments) == c))
 
+                val heuristic = (start: Coordinate, goal: Coordinate) => start.manhattanDistance(goal).toFloat
                 val path = AStar.aStar(sTCharacterTo, sTCharacterFrom, allNodes, neighbours, heuristic) match {
                     case Some(p) =>
                         p
@@ -88,18 +107,12 @@ object EncoderReachability {
 
             actions.toList
         }
-
-        private def coordinateFromCoordinateVariable(coordinateVariables: CoordinateVariable, assignmentsMap: immutable.Map[String, Value]): Coordinate = {
-            Coordinate(assignmentsMap(coordinateVariables.x.name).asInstanceOf[ValueInteger].v, assignmentsMap(coordinateVariables.y.name).asInstanceOf[ValueInteger].v)
-        }
     }
 }
 
 class EncoderReachability(override val instance: InstanceSokoban) extends EncoderSMT[StateReachability](instance) {
 
-    override def createState(number: Int): StateReachability = {
-        new StateReachability(number, instance)
-    }
+    override def createState(number: Int): StateReachability = new StateReachability(number, instance)
 
     override def createActions(sT: StateReachability, sTPlus: StateReachability): immutable.Seq[Action[StateReachability, SokobanActionEnum]] = {
         instance.boxes.indices.flatMap(b => SokobanAction.VALUES.map(f => new BoxActionReachability(f.shift, instanceSMT, sT, sTPlus, b).asInstanceOf[Action[StateReachability, SokobanActionEnum]]))
@@ -117,8 +130,8 @@ class EncoderReachability(override val instance: InstanceSokoban) extends Encode
         val terms = ListBuffer.empty[Term]
 
         for ((c, _) <- instance.map.iterator.filter(f => f._2.isPlayableArea)) {
-            val ors = for (b <- instance.boxes.indices) yield {
-                (state.boxes(b).x == Integer(c.x)) && (state.boxes(b).y == Integer(c.y))
+            val ors = for (b <- state.boxes) yield {
+                (b.x == Integer(c.x)) && (b.y == Integer(c.y))
             }
 
             val or = Operations.multipleTermsApply(ors, Or.FUNCTION_MULTIPLE)
@@ -130,7 +143,6 @@ class EncoderReachability(override val instance: InstanceSokoban) extends Encode
             val nodeStart = state.reachabilityNodes.get(c).get
 
             val ors = ListBuffer.empty[Term]
-
 
             for (end <- SokobanAction.VALUES.map(f => c + f.shift).filter(f => instance.existsAndPlayableArea(f))) {
                 val edgeInverse = state.reachabilityEdges.get((end, c)).get
@@ -148,4 +160,6 @@ class EncoderReachability(override val instance: InstanceSokoban) extends Encode
 
         terms.toList
     }
+
+    override val name: String = "EncoderReachability"
 }

@@ -5,7 +5,9 @@ import gmt.instance.Coordinate
 object SokobanAction {
 
     val VALUES = List(RIGHT, LEFT, UP, DOWN)
+
     private val shitMap = VALUES.map(f => (f.shift, f)).toMap
+    private val keyMap = VALUES.map(f => (f.key, f)).toMap
 
     sealed abstract class SokobanActionEnum(val shift: Coordinate, val key: String) {
         override def toString: String = key
@@ -17,4 +19,6 @@ object SokobanAction {
     case object DOWN extends SokobanActionEnum(Coordinate(+0, +1), "down")
 
     def fromShift(shit: Coordinate): Option[SokobanActionEnum] = shitMap.get(shit)
+
+    def fromKey(key: String): Option[SokobanActionEnum] = keyMap.get(key)
 }

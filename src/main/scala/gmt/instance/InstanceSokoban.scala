@@ -17,7 +17,6 @@ object InstanceSokoban {
     case class InvalidCharacterException() extends Exception
 
     def load(level: String): InstanceSokoban = {
-
         val lines = level.split('\n')
         val levelLines = lines.tail.map(f => f.toArray)
 
@@ -30,6 +29,7 @@ object InstanceSokoban {
         }
 
         val map = mutable.Map.empty[Coordinate, GameObjectEnum]
+        val emptyMap = mutable.Map.empty[Coordinate, GameObjectEnum]
 
         var characterOption: Option[Coordinate] = None
 
@@ -55,8 +55,10 @@ object InstanceSokoban {
                 gameObject match {
                     case EMPTY | WALL =>
                         map(coordinate) = gameObject
+                        emptyMap(coordinate) = gameObject
                     case CHARACTER =>
                         map(coordinate) = gameObject
+                        emptyMap(coordinate) = EMPTY
                         characterOption match {
                             case None =>
                                 characterOption = Some(coordinate)
@@ -65,14 +67,27 @@ object InstanceSokoban {
                         }
                     case BOX =>
                         map(coordinate) = gameObject
+                        emptyMap(coordinate) = EMPTY
                         boxes.append(coordinate)
                     case GOAL =>
                         map(coordinate) = gameObject
+                        emptyMap(coordinate) = gameObject
                         goals.append(coordinate)
                     case GOAL_BOX =>
                         map(coordinate) = gameObject
+                        emptyMap(coordinate) = GOAL
                         boxes.append(coordinate)
                         goals.append(coordinate)
+                    case GOAL_CHARACTER =>
+                        map(coordinate) = gameObject
+                        emptyMap(coordinate) = GOAL
+                        goals.append(coordinate)
+                        characterOption match {
+                            case None =>
+                                characterOption = Some(coordinate)
+                            case Some(characterCoordinate) =>
+                                throw MultipleCharactersException(characterCoordinate, coordinate)
+                        }
                     case _ =>
                         Unit
                 }
@@ -86,7 +101,7 @@ object InstanceSokoban {
                 throw NoCharacterException()
         }
 
-        InstanceSokoban(lines.head, width, levelLines.length, map.toMap, character, boxes.toVector, goals.toVector)
+        InstanceSokoban(lines.head, width, levelLines.length, map.toMap, emptyMap.toMap, character, boxes.toVector, goals.toVector)
     }
 }
 
@@ -94,13 +109,14 @@ case class InstanceSokoban private(name: String,
                                    width: Int,
                                    height: Int,
                                    map: immutable.Map[Coordinate, GameObjectEnum],
+                                   emptyMap: immutable.Map[Coordinate, GameObjectEnum],
                                    character: Coordinate,
                                    boxes: immutable.Seq[Coordinate],
                                    goals: immutable.Seq[Coordinate]) {
     validate()
 
     def this(instance: InstanceSokoban) {
-        this(instance.name, instance.width, instance.height, instance.map, instance.character, instance.boxes, instance.goals)
+        this(instance.name, instance.width, instance.height, instance.map, instance.emptyMap, instance.character, instance.boxes, instance.goals)
     }
 
     private def validate(): Unit = {

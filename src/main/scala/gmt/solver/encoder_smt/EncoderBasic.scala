@@ -4,6 +4,7 @@ import gmt.game.SokobanAction
 import gmt.game.SokobanAction.SokobanActionEnum
 import gmt.instance.{Coordinate, InstanceSokoban}
 import gmt.planner.language._
+import gmt.planner.language.Integer.ImplicitConstructor
 import gmt.planner.planner.ClassicPlanner.{Action, TimeStep}
 import gmt.planner.solver.value.Value
 import gmt.solver.encoder_smt.EncoderBasic._
@@ -223,44 +224,44 @@ object EncoderBasic {
         protected def preconditionBoxesBetween(): immutable.Seq[Term] = direction match {
             case SokobanAction.UP.shift =>
                 for (b <- sT.boxes.patch(box, Nil, 1)) yield {
-                    Or(b.x != sT.character.x, b.y > sT.character.y, b.y < sT.boxes(box).y - repetition)
+                    Or(b.x != sT.boxes(box).x, b.y > sT.boxes(box).y + 1, b.y < sT.boxes(box).y - repetition)
                 }
 
             case SokobanAction.DOWN.shift =>
                 for (b <- sT.boxes.patch(box, Nil, 1)) yield {
-                    Or(b.x != sT.character.x, b.y < sT.character.y, b.y > sT.boxes(box).y + repetition)
+                    Or(b.x != sT.boxes(box).x, b.y < sT.boxes(box).y - 1, b.y > sT.boxes(box).y + repetition)
                 }
 
             case SokobanAction.RIGHT.shift =>
                 for (b <- sT.boxes.patch(box, Nil, 1)) yield {
-                    Or(b.y != sT.character.y, b.x < sT.character.x, b.x > sT.boxes(box).x + repetition)
+                    Or(b.y != sT.boxes(box).y, b.x < sT.boxes(box).x - 1, b.x > sT.boxes(box).x + repetition)
                 }
 
             case SokobanAction.LEFT.shift =>
                 for (b <- sT.boxes.patch(box, Nil, 1)) yield {
-                    Or(b.y != sT.character.y, b.x > sT.character.x, b.x < sT.boxes(box).x - repetition)
+                    Or(b.y != sT.boxes(box).y, b.x > sT.boxes(box).x + 1, b.x < sT.boxes(box).x - repetition)
                 }
         }
 
         protected def preconditionWallsBetween(): immutable.Seq[Term] = direction match {
             case SokobanAction.UP.shift =>
                 for (c <- instanceSMT.bounds.walls) yield {
-                    Or(Integer(c.x) != sT.character.x, Integer(c.y) > sT.character.y, Integer(c.y) < sT.boxes(box).y - repetition)
+                    Or(Integer(c.x) != sT.boxes(box).x, Integer(c.y) > sT.boxes(box).y + 1, Integer(c.y) < sT.boxes(box).y - repetition)
                 }
 
             case SokobanAction.DOWN.shift =>
                 for (c <- instanceSMT.bounds.walls) yield {
-                    Or(Integer(c.x) != sT.character.x, Integer(c.y) < sT.character.y, Integer(c.y) > sT.boxes(box).y + repetition)
+                    Or(Integer(c.x) != sT.boxes(box).x, Integer(c.y) < sT.boxes(box).y - 1, Integer(c.y) > sT.boxes(box).y + repetition)
                 }
 
             case SokobanAction.RIGHT.shift =>
                 for (c <- instanceSMT.bounds.walls) yield {
-                    Or(Integer(c.y) != sT.character.y, Integer(c.x) < sT.character.x, Integer(c.x) > sT.boxes(box).x + repetition)
+                    Or(Integer(c.y) != sT.boxes(box).y, Integer(c.x) < sT.boxes(box).x - 1, Integer(c.x) > sT.boxes(box).x + repetition)
                 }
 
             case SokobanAction.LEFT.shift =>
                 for (c <- instanceSMT.bounds.walls) yield {
-                    Or(Integer(c.y) != sT.character.y, Integer(c.x) > sT.character.x, Integer(c.x) < sT.boxes(box).x - repetition)
+                    Or(Integer(c.y) != sT.boxes(box).y, Integer(c.x) > sT.boxes(box).x + 1, Integer(c.x) < sT.boxes(box).x - repetition)
                 }
         }
 
@@ -324,4 +325,6 @@ class EncoderBasic(override val instance: InstanceSokoban) extends EncoderSMT[St
         List(UpCharacterAction(instanceSMT, sT, sTPlus), DownCharacterAction(instanceSMT, sT, sTPlus), RightCharacterAction(instanceSMT, sT, sTPlus), LeftCharacterAction(instanceSMT, sT, sTPlus)) ++
             instance.boxes.indices.flatMap(b => SokobanAction.VALUES.map(f => BoxActionBasic(f.shift, instanceSMT, sT, sTPlus, b)))
     }
+
+    override val name: String = "EncoderBasic"
 }

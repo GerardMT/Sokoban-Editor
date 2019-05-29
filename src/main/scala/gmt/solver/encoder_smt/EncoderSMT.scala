@@ -1,15 +1,16 @@
 package gmt.solver.encoder_smt
 
-import gmt.game.GameObject.{ALIGN, WALL}
+import gmt.game.GameObject.{ALIGN, BOX, CHARACTER, EMPTY, WALL}
 import gmt.game.SokobanAction.SokobanActionEnum
 import gmt.instance.{Coordinate, InstanceSokoban}
 import gmt.planner.language._
 import gmt.planner.planner.ClassicPlanner
 import gmt.planner.planner.ClassicPlanner.{Action, State}
-import gmt.solver.CoordinateVariable
+import gmt.planner.solver.value.{Value, ValueInteger}
 import gmt.solver.encoder_smt.EncoderSMT.{Bounds, InstanceSMT, StateSMT}
+import gmt.solver.{CoordinateVariable, EncoderSokoban}
 
-import scala.collection.immutable
+import scala.collection.{immutable, mutable}
 import scala.collection.mutable.ListBuffer
 
 object EncoderSMT {
@@ -36,12 +37,44 @@ object EncoderSMT {
 
             variables.toList
         }
+
+        override def print(assignments: immutable.Map[String, Value]): Unit = {
+            val map = mutable.Map(instance.emptyMap.toSeq: _*)
+
+            for (b <- boxes) {
+                val cBox = coordinateFromCoordinateVariable(b, assignments)
+                map(cBox) = map(cBox) + BOX
+            }
+
+            val cCharacter = coordinateFromCoordinateVariable(character, assignments)
+            map(cCharacter) = map(cCharacter) + CHARACTER
+
+            val array = Array.ofDim[Char](instance.width, instance.height)
+            for (x <- 0 until instance.width; y <- 0 until instance.height) {
+                array(x)(y) = ALIGN.char
+            }
+            for ((c, a) <- map) {
+                array(c.x)(c.y) = a.char
+            }
+
+            System.out.println("STATE " + number)
+            for (y <- 0 until instance.height) {
+                for (x <- 0 until instance.width) {
+                    System.out.print(array(x)(y))
+                }
+                System.out.print("\n")
+            }
+        }
+
+        def coordinateFromCoordinateVariable(coordinateVariables: CoordinateVariable, assignmentsMap: immutable.Map[String, Value]): Coordinate = {
+            Coordinate(assignmentsMap(coordinateVariables.x.name).asInstanceOf[ValueInteger].v, assignmentsMap(coordinateVariables.y.name).asInstanceOf[ValueInteger].v)
+        }
     }
 
     abstract class ActionSMT(val instanceSMT: InstanceSMT, override val sT: StateSMT, override val sTPlus: StateSMT) extends Action[StateSMT, SokobanActionEnum](sT, sTPlus)
 }
 
-abstract class EncoderSMT[S <: StateSMT](val instance: InstanceSokoban) extends ClassicPlanner[S, InstanceSokoban, SokobanActionEnum] {
+abstract class EncoderSMT[S <: StateSMT](override val instance: InstanceSokoban) extends EncoderSokoban[S](instance) {
 
     protected val instanceSMT = new InstanceSMT(instance, getBounds)
 

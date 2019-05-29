@@ -8,13 +8,13 @@ import gmt.planner.planner.{Planner, PlannerOptions}
 import gmt.planner.solver.Yices2Solver
 import gmt.planner.translator.SMTLib2
 
-class SokobanSolver(val yicesPath: String) {
+class SokobanSolver(val yicesPath: String, upperBound: Int = 1000) {
 
     def solve(encoder: Encoder[SokobanActionEnum], updateListener: UpdateListener): SokobanPlan = {
         val translator = new SMTLib2(SMTLib2.QF_LIA)
         val solver = new Yices2Solver(yicesPath)
 
-        val planner = new Planner(PlannerOptions(Some(1), Some(1000)), encoder, translator, solver)
+        val planner = new Planner(PlannerOptions(Some(1), Some(upperBound)), encoder, translator, solver)
         planner.updateListener = Some(updateListener)
 
         val result = planner.solve()
