@@ -5,7 +5,7 @@ import gmt.game.SokobanAction.SokobanActionEnum
 import gmt.instance.{Coordinate, InstanceSokoban}
 import gmt.planner.language._
 import gmt.planner.language.Integer.ImplicitConstructor
-import gmt.planner.planner.ClassicPlanner.{Action, TimeStep}
+import gmt.planner.planner.ClassicPlanner.{Action, ClassicPlannerUpdatesCallback, TimeStep}
 import gmt.planner.solver.value.Value
 import gmt.solver.encoder_smt.EncoderBasic._
 import gmt.solver.encoder_smt.EncoderSMT.{ActionSMT, InstanceSMT, StateSMT}
@@ -21,7 +21,7 @@ object EncoderBasic {
 
         override val repetition: Variable = repetitionModule.repetition
 
-        protected val direction: Coordinate
+        protected val direction: SokobanActionEnum
 
         protected def terms(): immutable.Seq[Term] = {
             List(ClauseDeclaration(repetition > Integer(0)))
@@ -42,9 +42,9 @@ object EncoderBasic {
             super.getVariables ++ repetitionModule.getVariables
         }
 
-        def decode(assignments: Map[String, Value]): immutable.Seq[SokobanActionEnum] = { // TODO Extract to function
+        def decode(assignments: Map[String, Value], updatesCallback:ClassicPlannerUpdatesCallback): immutable.Seq[SokobanActionEnum] = { // TODO Extract to function
             val r = repetitionModule.decode(assignments)
-            (0 until Math.abs(r)).map(_ => SokobanAction.fromShift(direction).get)
+            (0 until Math.abs(r)).map(_ => direction)
         }
     }
 
@@ -52,7 +52,7 @@ object EncoderBasic {
 
         override def postName: String = "C_U"
 
-        override protected val direction: Coordinate = SokobanAction.UP.shift
+        override protected val direction: SokobanActionEnum = SokobanAction.UP
 
         override protected def preconditions(): immutable.Seq[Term] = {
             val pres = ListBuffer.empty[Term]
@@ -84,7 +84,7 @@ object EncoderBasic {
 
         override def postName: String = "C_D"
 
-        override protected val direction: Coordinate = SokobanAction.DOWN.shift
+        override protected val direction: SokobanActionEnum = SokobanAction.DOWN
 
         override protected def preconditions(): immutable.Seq[Term] = {
             val pres = ListBuffer.empty[Term]
@@ -116,7 +116,7 @@ object EncoderBasic {
 
         override def postName: String = "C_R"
 
-        override protected val direction: Coordinate = SokobanAction.RIGHT.shift
+        override protected val direction: SokobanActionEnum = SokobanAction.RIGHT
 
         override protected def preconditions(): immutable.Seq[Term] = {
             val pres = ListBuffer.empty[Term]
@@ -148,7 +148,7 @@ object EncoderBasic {
 
         override def postName: String = "C_L"
 
-        override protected val direction: Coordinate = SokobanAction.LEFT.shift
+        override protected val direction: SokobanActionEnum = SokobanAction.LEFT
 
         override protected def preconditions(): immutable.Seq[Term] = {
             val pres = ListBuffer.empty[Term]
@@ -176,24 +176,13 @@ object EncoderBasic {
         }
     }
 
-    case class BoxActionBasic(direction: Coordinate, override val instanceSMT: InstanceSMT, override val sT: StateSMT, override val sTPlus: StateSMT, box: Int) extends ActionSMT(instanceSMT, sT, sTPlus) with RepetitionInterface {
+    case class BoxActionBasic(sokobanAction: SokobanActionEnum, override val instanceSMT: InstanceSMT, override val sT: StateSMT, override val sTPlus: StateSMT, box: Int) extends ActionSMT(instanceSMT, sT, sTPlus) with RepetitionInterface {
 
         val repetitionModule = new Repetition(name)
 
         override val repetition: Variable = repetitionModule.repetition
 
-        override def postName: String = "B" + box.toString + directionName
-
-        private def directionName: String = direction match {
-            case SokobanAction.UP.shift =>
-                "U"
-            case SokobanAction.DOWN.shift =>
-                "D"
-            case SokobanAction.LEFT.shift =>
-                "L"
-            case SokobanAction.RIGHT.shift =>
-                "R"
-        }
+        override def postName: String = "B" + box.toString + sokobanAction.key
 
         protected def terms(): immutable.Seq[Term] = {
             List(ClauseDeclaration(repetition > Integer(0)))
@@ -203,63 +192,63 @@ object EncoderBasic {
             preconditionCharacter() ++ preconditionBoxesBetween() ++ preconditionWallsBetween()
         }
 
-        protected def preconditionCharacter(): immutable.Seq[Term] = direction match {
-            case SokobanAction.UP.shift =>
+        protected def preconditionCharacter(): immutable.Seq[Term] = sokobanAction match {
+            case SokobanAction.UP_BOX =>
                 List(sT.boxes(box).x == sT.character.x,
                     sT.boxes(box).y == sT.character.y - Integer(1))
 
-            case SokobanAction.DOWN.shift =>
+            case SokobanAction.DOWN_BOX =>
                 List(sT.boxes(box).x == sT.character.x,
                     sT.boxes(box).y == sT.character.y + Integer(1))
 
-            case SokobanAction.RIGHT.shift =>
+            case SokobanAction.RIGHT_BOX  =>
                 List(sT.boxes(box).x == sT.character.x + Integer(1),
                     sT.boxes(box).y == sT.character.y)
 
-            case SokobanAction.LEFT.shift =>
+            case SokobanAction.LEFT_BOX  =>
                 List(sT.boxes(box).x == sT.character.x - Integer(1),
                     sT.boxes(box).y == sT.character.y)
         }
 
-        protected def preconditionBoxesBetween(): immutable.Seq[Term] = direction match {
-            case SokobanAction.UP.shift =>
+        protected def preconditionBoxesBetween(): immutable.Seq[Term] = sokobanAction match {
+            case SokobanAction.UP_BOX =>
                 for (b <- sT.boxes.patch(box, Nil, 1)) yield {
                     Or(b.x != sT.boxes(box).x, b.y > sT.boxes(box).y + 1, b.y < sT.boxes(box).y - repetition)
                 }
 
-            case SokobanAction.DOWN.shift =>
+            case SokobanAction.DOWN_BOX =>
                 for (b <- sT.boxes.patch(box, Nil, 1)) yield {
                     Or(b.x != sT.boxes(box).x, b.y < sT.boxes(box).y - 1, b.y > sT.boxes(box).y + repetition)
                 }
 
-            case SokobanAction.RIGHT.shift =>
+            case SokobanAction.RIGHT_BOX  =>
                 for (b <- sT.boxes.patch(box, Nil, 1)) yield {
                     Or(b.y != sT.boxes(box).y, b.x < sT.boxes(box).x - 1, b.x > sT.boxes(box).x + repetition)
                 }
 
-            case SokobanAction.LEFT.shift =>
+            case SokobanAction.LEFT_BOX  =>
                 for (b <- sT.boxes.patch(box, Nil, 1)) yield {
                     Or(b.y != sT.boxes(box).y, b.x > sT.boxes(box).x + 1, b.x < sT.boxes(box).x - repetition)
                 }
         }
 
-        protected def preconditionWallsBetween(): immutable.Seq[Term] = direction match {
-            case SokobanAction.UP.shift =>
+        protected def preconditionWallsBetween(): immutable.Seq[Term] = sokobanAction match {
+            case SokobanAction.UP_BOX =>
                 for (c <- instanceSMT.bounds.walls) yield {
                     Or(Integer(c.x) != sT.boxes(box).x, Integer(c.y) > sT.boxes(box).y + 1, Integer(c.y) < sT.boxes(box).y - repetition)
                 }
 
-            case SokobanAction.DOWN.shift =>
+            case SokobanAction.DOWN_BOX  =>
                 for (c <- instanceSMT.bounds.walls) yield {
                     Or(Integer(c.x) != sT.boxes(box).x, Integer(c.y) < sT.boxes(box).y - 1, Integer(c.y) > sT.boxes(box).y + repetition)
                 }
 
-            case SokobanAction.RIGHT.shift =>
+            case SokobanAction.RIGHT_BOX  =>
                 for (c <- instanceSMT.bounds.walls) yield {
                     Or(Integer(c.y) != sT.boxes(box).y, Integer(c.x) < sT.boxes(box).x - 1, Integer(c.x) > sT.boxes(box).x + repetition)
                 }
 
-            case SokobanAction.LEFT.shift =>
+            case SokobanAction.LEFT_BOX =>
                 for (c <- instanceSMT.bounds.walls) yield {
                     Or(Integer(c.y) != sT.boxes(box).y, Integer(c.x) > sT.boxes(box).x + 1, Integer(c.x) < sT.boxes(box).x - repetition)
                 }
@@ -273,29 +262,29 @@ object EncoderBasic {
                 effs.append(sTPlus.boxes(b).y == sT.boxes(b).y)
             }
 
-            direction match {
-                case SokobanAction.UP.shift =>
+            sokobanAction match {
+                case SokobanAction.UP_BOX =>
                     effs.append(sTPlus.boxes(box).x == sT.boxes(box).x)
                     effs.append(sTPlus.boxes(box).y == sT.boxes(box).y - repetition)
 
                     effs.append(sTPlus.character.x == sTPlus.boxes(box).x)
                     effs.append(sTPlus.character.y == sTPlus.boxes(box).y + Integer(1))
 
-                case SokobanAction.DOWN.shift =>
+                case SokobanAction.DOWN_BOX =>
                     effs.append(sTPlus.boxes(box).x == sT.boxes(box).x)
                     effs.append(sTPlus.boxes(box).y == sT.boxes(box).y + repetition)
 
                     effs.append(sTPlus.character.x == sTPlus.boxes(box).x)
                     effs.append(sTPlus.character.y == sTPlus.boxes(box).y - Integer(1))
 
-                case SokobanAction.RIGHT.shift =>
+                case SokobanAction.RIGHT_BOX =>
                     effs.append(sTPlus.boxes(box).x == sT.boxes(box).x + repetition)
                     effs.append(sTPlus.boxes(box).y == sT.boxes(box).y)
 
                     effs.append(sTPlus.character.x == sTPlus.boxes(box).x - Integer(1))
                     effs.append(sTPlus.character.y == sTPlus.boxes(box).y)
 
-                case SokobanAction.LEFT.shift =>
+                case SokobanAction.LEFT_BOX =>
                     effs.append(sTPlus.boxes(box).x == sT.boxes(box).x - repetition)
                     effs.append(sTPlus.boxes(box).y == sT.boxes(box).y)
 
@@ -310,20 +299,20 @@ object EncoderBasic {
             super.getVariables ++ repetitionModule.getVariables
         }
 
-        def decode(assignments: Map[String, Value]): immutable.Seq[SokobanActionEnum] = {
+        def decode(assignments: Map[String, Value], updatesCallback:ClassicPlannerUpdatesCallback): immutable.Seq[SokobanActionEnum] = {
             val r = repetitionModule.decode(assignments)
-            (0 until Math.abs(r)).map(_ => SokobanAction.fromShift(direction).get)
+            (0 until Math.abs(r)).map(_ => sokobanAction)
         }
     }
 }
 
-class EncoderBasic(override val instance: InstanceSokoban) extends EncoderSMT[StateSMT](instance) {
+class EncoderBasic(override val instance: InstanceSokoban, override val updatesCallback: ClassicPlannerUpdatesCallback) extends EncoderSMT[StateSMT](instance, updatesCallback) {
 
     override def createState(number: Int): StateSMT = new StateSMT(number, instance)
 
     override def createActions(sT: StateSMT, sTPlus: StateSMT): immutable.Seq[Action[StateSMT, SokobanActionEnum]] = {
         List(UpCharacterAction(instanceSMT, sT, sTPlus), DownCharacterAction(instanceSMT, sT, sTPlus), RightCharacterAction(instanceSMT, sT, sTPlus), LeftCharacterAction(instanceSMT, sT, sTPlus)) ++
-            instance.boxes.indices.flatMap(b => SokobanAction.VALUES.map(f => BoxActionBasic(f.shift, instanceSMT, sT, sTPlus, b)))
+            instance.boxes.indices.flatMap(b => SokobanAction.VALUES_BOX.map(f => BoxActionBasic(f, instanceSMT, sT, sTPlus, b)))
     }
 
     override val name: String = "EncoderBasic"

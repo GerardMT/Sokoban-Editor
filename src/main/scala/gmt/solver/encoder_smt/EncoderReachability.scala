@@ -6,13 +6,12 @@ import gmt.game.SokobanAction.SokobanActionEnum
 import gmt.instance.{Coordinate, InstanceSokoban}
 import gmt.planner.language
 import gmt.planner.language._
-import gmt.planner.language.Integer.ImplicitConstructor
 import gmt.planner.planner.ClassicPlanner._
-import gmt.planner.solver.value.{Value, ValueInteger}
+import gmt.planner.solver.value.Value
+import gmt.solver.PlanInvalidException
 import gmt.solver.encoder_smt.EncoderBasic.BoxActionBasic
 import gmt.solver.encoder_smt.EncoderReachability.{BoxActionReachability, StateReachability}
 import gmt.solver.encoder_smt.EncoderSMT.{InstanceSMT, StateSMT}
-import gmt.solver.{CoordinateVariable, PlanInvalidException}
 import gmt.util.AStar
 
 import scala.collection.immutable
@@ -20,7 +19,7 @@ import scala.collection.mutable.ListBuffer
 
 object EncoderReachability {
 
-    class StateReachability(override val number: Int, private val instance: InstanceSokoban) extends StateSMT(number, instance) {
+    class StateReachability(override val number: Int, override val instance: InstanceSokoban) extends StateSMT(number, instance) {
         val reachabilityNodes: SortedMap[Coordinate, Variable] = SortedMap.empty[Coordinate, Variable]
         val reachabilityWeights: SortedMap[Coordinate, Variable] = SortedMap.empty[Coordinate, Variable]
         val reachabilityEdges: SortedMap[(Coordinate, Coordinate), Variable] = SortedMap.empty[(Coordinate, Coordinate), Variable]
@@ -29,7 +28,7 @@ object EncoderReachability {
             reachabilityNodes.put(c, language.Variable("S" + number + "_RN_X" + c.x + "Y" + c.y, Type.Boolean))
             reachabilityWeights.put(c, Variable("S" + number + "RW_X" + c.x + "Y" + c.y, Type.Integer))
 
-            for (shift <- SokobanAction.VALUES.map(f => f.shift)) {
+            for (shift <- SokobanAction.VALUES_CHARACTER.map(f => f.shift)) {
                 val end = c + shift
                 if (instance.map.contains(end)) {
                     reachabilityEdges.put((c, end), Variable("S" + number + "_RA_X" + c.x + "Y" + c.y + "TX" + end.x + "Y" + end.y, Type.Boolean))
@@ -48,7 +47,7 @@ object EncoderReachability {
         }
     }
 
-    class BoxActionReachability(override val direction: Coordinate, instance: InstanceSMT, override val sT: StateReachability, override val sTPlus: StateSMT, override val box: Int) extends BoxActionBasic(direction, instance, sT, sTPlus, box) {
+    class BoxActionReachability(override val sokobanAction: SokobanActionEnum, instance: InstanceSMT, override val sT: StateReachability, override val sTPlus: StateSMT, override val box: Int) extends BoxActionBasic(sokobanAction, instance, sT, sTPlus, box) {
 
         override protected def preconditions(): immutable.Seq[Term] = {
             val pres = ListBuffer.empty[Term]
@@ -56,18 +55,18 @@ object EncoderReachability {
             pres.appendAll(super.preconditionWallsBetween())
             pres.appendAll(super.preconditionBoxesBetween())
 
-            for ((c, rn) <- sT.reachabilityNodes.filter(f => instance.existsAndPlayableArea(f._1 + direction))) {
-                direction match {
-                    case SokobanAction.UP.shift =>
+            for ((c, rn) <- sT.reachabilityNodes.filter(f => instance.existsAndPlayableArea(f._1 + sokobanAction.shift))) {
+                sokobanAction match {
+                    case SokobanAction.UP_BOX =>
                         pres.append(((sT.boxes(box).x == Integer(c.x)) && (sT.boxes(box).y == Integer(c.y - 1))) ==> rn)
 
-                    case SokobanAction.DOWN.shift =>
+                    case SokobanAction.DOWN_BOX =>
                         pres.append(((sT.boxes(box).x == Integer(c.x)) && (sT.boxes(box).y == Integer(c.y + 1))) ==> rn)
 
-                    case SokobanAction.RIGHT.shift =>
+                    case SokobanAction.RIGHT_BOX =>
                         pres.append(((sT.boxes(box).x == Integer(c.x + 1)) && (sT.boxes(box).y == Integer(c.y))) ==> rn)
 
-                    case SokobanAction.LEFT.shift =>
+                    case SokobanAction.LEFT_BOX =>
                         pres.append(((sT.boxes(box).x == Integer(c.x - 1)) && (sT.boxes(box).y == Integer(c.y))) ==> rn)
 
                     case _ =>
@@ -77,18 +76,18 @@ object EncoderReachability {
             pres.toList
         }
 
-        override def decode(assignments: immutable.Map[String, Value]): immutable.Seq[SokobanActionEnum] = {
+        override def decode(assignments: immutable.Map[String, Value], updatesCallback:ClassicPlannerUpdatesCallback): immutable.Seq[SokobanActionEnum] = {
             val actions = ListBuffer.empty[SokobanActionEnum]
 
             val sTCharacterFrom = sT.coordinateFromCoordinateVariable(sT.character, assignments)
-            val sTCharacterTo = sT.coordinateFromCoordinateVariable(sT.boxes(box), assignments) - direction
+            val sTCharacterTo = sT.coordinateFromCoordinateVariable(sT.boxes(box), assignments) - sokobanAction.shift
 
             if (sTCharacterFrom.manhattanDistance(sTCharacterTo) >= 1) {
                 val allNodes = () => instance.map.filter(f => f._2.isPlayableArea).keys
                     .filter(c => !sT.boxes.exists(b => sT.coordinateFromCoordinateVariable(b, assignments) == c))
                     .toList
 
-                val neighbours = (c: Coordinate) => SokobanAction.VALUES.map(a => c + a.shift)
+                val neighbours = (c: Coordinate) => SokobanAction.VALUES_CHARACTER.map(a => c + a.shift)
                     .filter(c => instance.existsAndPlayableArea(c))
                     .filter(c => !sT.boxes.exists(b => sT.coordinateFromCoordinateVariable(b, assignments) == c))
 
@@ -100,22 +99,22 @@ object EncoderReachability {
                         throw PlanInvalidException()
                 }
 
-                actions.appendAll(path.sliding(2).map(f => SokobanAction.fromShift(f(1) - f(0)).get))
+                actions.appendAll(path.sliding(2).map(f => SokobanAction.characterFromShift(f(1) - f(0)).get))
             }
 
-            actions.appendAll(super.decode(assignments))
+            actions.appendAll(super.decode(assignments, updatesCallback))
 
             actions.toList
         }
     }
 }
 
-class EncoderReachability(override val instance: InstanceSokoban) extends EncoderSMT[StateReachability](instance) {
+class EncoderReachability(override val instance: InstanceSokoban, override val updatesCallback: ClassicPlannerUpdatesCallback) extends EncoderSMT[StateReachability](instance, updatesCallback) {
 
     override def createState(number: Int): StateReachability = new StateReachability(number, instance)
 
     override def createActions(sT: StateReachability, sTPlus: StateReachability): immutable.Seq[Action[StateReachability, SokobanActionEnum]] = {
-        instance.boxes.indices.flatMap(b => SokobanAction.VALUES.map(f => new BoxActionReachability(f.shift, instanceSMT, sT, sTPlus, b).asInstanceOf[Action[StateReachability, SokobanActionEnum]]))
+        instance.boxes.indices.flatMap(b => SokobanAction.VALUES_BOX.map(f => new BoxActionReachability(f, instanceSMT, sT, sTPlus, b).asInstanceOf[Action[StateReachability, SokobanActionEnum]]))
     }
 
     override def encodeInitialState(state: StateReachability): immutable.Seq[Term] = {
@@ -144,7 +143,7 @@ class EncoderReachability(override val instance: InstanceSokoban) extends Encode
 
             val ors = ListBuffer.empty[Term]
 
-            for (end <- SokobanAction.VALUES.map(f => c + f.shift).filter(f => instance.existsAndPlayableArea(f))) {
+            for (end <- SokobanAction.VALUES_CHARACTER.map(f => c + f.shift).filter(f => instance.existsAndPlayableArea(f))) {
                 val edgeInverse = state.reachabilityEdges.get((end, c)).get
 
                 ors.append(edgeInverse)

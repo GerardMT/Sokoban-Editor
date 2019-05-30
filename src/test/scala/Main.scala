@@ -3,9 +3,7 @@ import java.io.File
 import gmt.game.SokobanAction
 import gmt.game.SokobanAction.SokobanActionEnum
 import gmt.instance.InstanceSokoban
-import gmt.planner.fixedPlanner.FixedPlannerResult
-import gmt.planner.planner.ClassicPlanner.State
-import gmt.planner.planner.Planner.UpdateListener
+import gmt.planner.planner.ClassicPlanner.{ClassicPlannerUpdatesCallback, State}
 import gmt.solver._
 import gmt.terminal.Main.getSettings
 
@@ -19,8 +17,7 @@ object Main {
 
     case class Test(instance: InstanceSokoban, testFunction: TestFunction)
 
-    object EmptyUpdateListener extends UpdateListener {
-        override def updated(fixedPlannerResult: FixedPlannerResult.FixedPlannerResult): Unit = {}
+    object EmptyUpdateListener extends ClassicPlannerUpdatesCallback {
     }
 
     abstract case class TestFunction(encoderSokoban: EncoderSokoban[_ <: State], sokobanSolver: SokobanSolver) {
@@ -79,7 +76,7 @@ object Main {
     def listLevels(directory: Seq[String]): Seq[File] = directory.flatMap(d => new File(d).listFiles.filter(f => f.isFile && f.getPath.endsWith(".lvl")).toList)
 
     def loadPlan(plan: String): Seq[SokobanActionEnum] = {
-        plan.linesIterator.toList.tail.map(f => SokobanAction.fromKey(f).get)
+        plan.linesIterator.toList(1).map(f => SokobanAction.fromKey(f.toString).get)
     }
 
     def main(args: Array[String]): Unit = {
@@ -101,7 +98,7 @@ object Main {
             val lines = readLines(f.getAbsolutePath)
             val instance = InstanceSokoban.load(lines)
 
-            for (e <- EncoderFactory(instance)) {
+            for (e <- EncoderFactory(instance, EmptyUpdateListener)) {
                 val planFile = new File(f.getAbsolutePath.dropRight(4) + ".plan")
                 val test = if (planFile.exists()) {
                     new SatPlan(e, sokobanSolver, loadPlan(readLines(planFile.getAbsolutePath)))
@@ -116,7 +113,7 @@ object Main {
         for (f <- listLevels(UNSAT_DIRECTORIES)) {
             val lines = readLines(f.getAbsolutePath)
             val instance = InstanceSokoban.load(lines)
-            for (e <- EncoderFactory(instance)) {
+            for (e <- EncoderFactory(instance, EmptyUpdateListener)) {
                 tests.append(Test(instance, new TestFunction(e, sokobanSolverUnsat) with Unsat))
             }
         }

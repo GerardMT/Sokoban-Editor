@@ -1,15 +1,58 @@
 package gmt.terminal
 
+import gmt.game.GameObject.{ALIGN, BOX, CHARACTER}
 import gmt.instance.InstanceSokoban
 import gmt.main.Settings
 import gmt.planner.fixedPlanner.FixedPlannerResult.FixedPlannerResult
-import gmt.planner.planner.Planner.UpdateListener
+import gmt.planner.planner.ClassicPlanner.ClassicPlannerUpdatesCallback
+import gmt.planner.solver.value.Value
+import gmt.solver.encoder_smt.EncoderSMT.StateSMT
 import gmt.solver.encoder_smt.{EncoderBasic, EncoderReachability}
 import gmt.solver.{SokobanSolver, SolvedSokobanPlan, UnsolvedSokobanPlan}
 
+import scala.collection.mutable
 import scala.io.Source
 
-object Main extends UpdateListener {
+object Main {
+
+    object TerminalPrinter extends ClassicPlannerUpdatesCallback {
+
+        override def plannerUpdate: Option[Function[FixedPlannerResult, _]] = Some(plannerUpdatePrint)
+
+        override def stateDecoded = Some(stateDecodePrint)
+
+        def plannerUpdatePrint(fixedPlannerResult: FixedPlannerResult): Unit = {
+            println("timesteps=" + fixedPlannerResult.timeSteps + " time=" + fixedPlannerResult.milliseconds)
+        }
+
+        def stateDecodePrint[A <: StateSMT](state: A, assignments: Map[String, Value]): Unit = {
+            val map = mutable.Map(state.instance.emptyMap.toSeq: _*)
+
+            for (b <- state.boxes) {
+                val cBox = state.coordinateFromCoordinateVariable(b, assignments)
+                map(cBox) = map(cBox) + BOX
+            }
+
+            val cCharacter = state.coordinateFromCoordinateVariable(state.character, assignments)
+            map(cCharacter) = map(cCharacter) + CHARACTER
+
+            val array = Array.ofDim[Char](state.instance.width, state.instance.height)
+            for (x <- 0 until state.instance.width; y <- 0 until state.instance.height) {
+                array(x)(y) = ALIGN.char
+            }
+            for ((c, a) <- map) {
+                array(c.x)(c.y) = a.char
+            }
+
+            System.out.println("STATE " + state.number)
+            for (y <- 0 until state.instance.height) {
+                for (x <- 0 until state.instance.width) {
+                    System.out.print(array(x)(y))
+                }
+                System.out.print("\n")
+            }
+        }
+    }
 
     def updated(fixedPlannerResult: FixedPlannerResult): Unit = {
         println(fixedPlannerResult)
@@ -39,9 +82,9 @@ object Main extends UpdateListener {
 
         val result = args.toList match {
             case List("smt_basic", instancePath) =>
-                sokobanSolver.solve(new EncoderBasic(loadInstance(instancePath)), this)
+                sokobanSolver.solve(new EncoderBasic(loadInstance(instancePath), TerminalPrinter), TerminalPrinter)
             case List("smt_reachability", instancePath) =>
-                sokobanSolver.solve(new EncoderReachability(loadInstance(instancePath)), this)
+                sokobanSolver.solve(new EncoderReachability(loadInstance(instancePath), TerminalPrinter), TerminalPrinter)
             case _ =>
                 System.out.println("Unknown arguments")
                 sys.exit(0)
@@ -51,7 +94,9 @@ object Main extends UpdateListener {
 
         result match {
             case SolvedSokobanPlan(plan, _) =>
-                println(plan.map(f => f + "\n").mkString)
+                val planStr = plan.mkString
+                println(planStr)
+                println("lenght=" + planStr.length)
             case UnsolvedSokobanPlan() =>
                 println("Unsolved")
         }
