@@ -94,14 +94,6 @@ abstract class EncoderSMT[S <: StateSMT](override val instance: InstanceSokoban,
         terms.toList
     }
 
-    def lowerBound(): Int = {
-        throw new UnsupportedOperationException()
-    }
-
-    def upperBound(): Int = {
-        throw new UnsupportedOperationException()
-    }
-
     private def getBounds: Bounds = {
         val map = Array.ofDim[Char](instance.width, instance.height)
 
