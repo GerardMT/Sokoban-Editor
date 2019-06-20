@@ -43,6 +43,8 @@ object InstanceSokoban {
                 width = l.length
             }
 
+            var firstWall = false
+
             for ((c, x) <- l.zipWithIndex) {
                 val coordinate = Coordinate(x, y)
                 val gameObject = GameObject.fromCharacter(c) match {
@@ -53,9 +55,15 @@ object InstanceSokoban {
                 }
 
                 gameObject match {
-                    case EMPTY | WALL =>
+                    case WALL =>
+                        firstWall = true
                         map(coordinate) = gameObject
                         emptyMap(coordinate) = gameObject
+                    case EMPTY =>
+                        if (firstWall) {
+                            map(coordinate) = gameObject
+                            emptyMap(coordinate) = gameObject
+                        }
                     case CHARACTER =>
                         map(coordinate) = gameObject
                         emptyMap(coordinate) = EMPTY

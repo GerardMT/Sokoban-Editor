@@ -14,17 +14,41 @@ object SokobanAction {
 
     sealed abstract class SokobanActionEnum(val shift: Coordinate, val key: String) {
         override def toString: String = key
+
+        def boxAction: Boolean
     }
 
-    case object RIGHT extends SokobanActionEnum(Coordinate(+1, +0), "r")
-    case object LEFT extends SokobanActionEnum(Coordinate(-1, +0), "l")
-    case object UP extends SokobanActionEnum(Coordinate(+0, -1), "u")
-    case object DOWN extends SokobanActionEnum(Coordinate(+0, +1), "d")
+    case object RIGHT extends SokobanActionEnum(Coordinate(+1, +0), "r") {
+        override def boxAction: Boolean = false
+    }
 
-    case object RIGHT_BOX extends SokobanActionEnum(Coordinate(+1, +0), "R")
-    case object LEFT_BOX extends SokobanActionEnum(Coordinate(-1, +0), "L")
-    case object UP_BOX extends SokobanActionEnum(Coordinate(+0, -1), "U")
-    case object DOWN_BOX extends SokobanActionEnum(Coordinate(+0, +1), "D")
+    case object LEFT extends SokobanActionEnum(Coordinate(-1, +0), "l") {
+        override def boxAction: Boolean = false
+    }
+
+    case object UP extends SokobanActionEnum(Coordinate(+0, -1), "u") {
+        override def boxAction: Boolean = false
+    }
+
+    case object DOWN extends SokobanActionEnum(Coordinate(+0, +1), "d") {
+        override def boxAction: Boolean = false
+    }
+
+    case object RIGHT_BOX extends SokobanActionEnum(Coordinate(+1, +0), "R") {
+        override def boxAction: Boolean = true
+    }
+
+    case object LEFT_BOX extends SokobanActionEnum(Coordinate(-1, +0), "L") {
+        override def boxAction: Boolean = true
+    }
+
+    case object UP_BOX extends SokobanActionEnum(Coordinate(+0, -1), "U") {
+        override def boxAction: Boolean = true
+    }
+
+    case object DOWN_BOX extends SokobanActionEnum(Coordinate(+0, +1), "D") {
+        override def boxAction: Boolean = true
+    }
 
     def characterFromShift(shit: Coordinate): Option[SokobanActionEnum] = characterShitMap.get(shit)
 

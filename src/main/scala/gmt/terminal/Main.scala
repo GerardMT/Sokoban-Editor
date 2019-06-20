@@ -97,8 +97,9 @@ object Main {
         result match {
             case SolvedSokobanPlan(plan, _) =>
                 val planStr = plan.mkString
-                println(planStr)
+                println("plan=" + planStr)
                 println("lenght=" + planStr.length)
+                println("box_actions=" + plan.count(f => f.boxAction))
             case UnsolvedSokobanPlan() =>
                 println("Unsolved")
         }
