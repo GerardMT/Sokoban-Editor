@@ -1,5 +1,7 @@
 package gmt.terminal
 
+import java.io.File
+
 import gmt.game.GameObject.{ALIGN, BOX, CHARACTER}
 import gmt.instance.InstanceSokoban
 import gmt.main.Settings
@@ -59,7 +61,7 @@ object Main {
     }
 
     def getSettings() = {
-        val settingsPath = System.getProperty("user.dir") + "/config"
+        val settingsPath = new File(Main.getClass.getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getPath  + "/config"
         val source = Source.fromFile(settingsPath)
         val lines = try source.mkString finally source.close()
         Settings.from(lines)
