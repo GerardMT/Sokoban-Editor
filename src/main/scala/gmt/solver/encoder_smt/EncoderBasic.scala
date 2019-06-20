@@ -23,7 +23,7 @@ object EncoderBasic {
 
         protected val direction: SokobanActionEnum
 
-        protected def terms(): immutable.Seq[Term] = {
+        override protected def terms(): immutable.Seq[Term] = {
             List(ClauseDeclaration(repetition > Integer(0)))
         }
 
@@ -184,7 +184,7 @@ object EncoderBasic {
 
         override def postName: String = "B" + box.toString + sokobanAction.key
 
-        protected def terms(): immutable.Seq[Term] = {
+        override protected def terms(): immutable.Seq[Term] = {
             List(ClauseDeclaration(repetition > Integer(0)))
         }
 

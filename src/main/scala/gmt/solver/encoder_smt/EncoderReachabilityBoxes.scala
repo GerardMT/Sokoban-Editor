@@ -10,8 +10,9 @@ import gmt.planner.planner.ClassicPlanner._
 import gmt.planner.solver.value.Value
 import gmt.solver.EncoderSokoban
 import gmt.solver.encoder_smt.EncoderReachabilityBoxes.{ActionReachabilityBoxes, Reachability, StateReachabilityBoxes}
+import jdk.jshell.spi.ExecutionControl.NotImplementedException
 
-import scala.collection.immutable
+import scala.collection.{immutable, mutable}
 import scala.collection.mutable.ListBuffer
 
 
@@ -102,34 +103,36 @@ object EncoderReachabilityBoxes {
             terms.appendAll(characterReachabilityWeights.values.map(f => VariableDeclaration(f)))
             terms.appendAll(characterReachabilityTime.values.map(f => VariableDeclaration(f)))
 
-            for ((c, _) <- instance.map.iterator.filter(f => f._2.isPlayableArea)) {
-                val ors = for (b <- state.boxes) yield {
-                    (b.x == Integer(c.x)) && (b.y == Integer(c.y))
-                }
+            throw new NotImplementedException("")
 
-                val or = Operations.multipleTermsApply(ors, Or.FUNCTION_MULTIPLE)
-
-                terms.append(ClauseDeclaration(or ==> !state.reachabilityNodes.get(c).get))
-            }
-
-            for ((c, _) <- instance.map.filter(f => f._2.isPlayableArea)) {
-                val nodeStart = state.reachabilityNodes.get(c).get
-
-                val ors = ListBuffer.empty[Term]
-
-                for (end <- SokobanAction.VALUES_CHARACTER.map(f => c + f.shift).filter(f => instance.existsAndPlayableArea(f))) {
-                    val edgeInverse = state.reachabilityEdges.get((end, c)).get
-
-                    ors.append(edgeInverse)
-
-                    terms.append(ClauseDeclaration(edgeInverse ==> state.reachabilityNodes.get(end).get))
-                    terms.append(ClauseDeclaration(edgeInverse ==> (state.reachabilityWeights.get(end).get < state.reachabilityWeights.get(c).get)))
-                }
-
-                if (ors.nonEmpty) {
-                    terms.append(ClauseDeclaration(((!(state.character.x == Integer(c.x)) || !(state.character.y == Integer(c.y))) && nodeStart) ==> Operations.multipleTermsApply(ors.toList, Or.FUNCTION_MULTIPLE)))
-                }
-            }
+//            for ((c, _) <- instance.map.iterator.filter(f => f._2.isPlayableArea)) {
+//                val ors = for (b <- state.boxes) yield {
+//                    (b.x == Integer(c.x)) && (b.y == Integer(c.y))
+//                }
+//
+//                val or = Operations.multipleTermsApply(ors, Or.FUNCTION_MULTIPLE)
+//
+//                terms.append(ClauseDeclaration(or ==> !state.reachabilityNodes.get(c).get))
+//            }
+//
+//            for ((c, _) <- instance.map.filter(f => f._2.isPlayableArea)) {
+//                val nodeStart = state.reachabilityNodes.get(c).get
+//
+//                val ors = ListBuffer.empty[Term]
+//
+//                for (end <- SokobanAction.VALUES_CHARACTER.map(f => c + f.shift).filter(f => instance.existsAndPlayableArea(f))) {
+//                    val edgeInverse = state.reachabilityEdges.get((end, c)).get
+//
+//                    ors.append(edgeInverse)
+//
+//                    terms.append(ClauseDeclaration(edgeInverse ==> state.reachabilityNodes.get(end).get))
+//                    terms.append(ClauseDeclaration(edgeInverse ==> (state.reachabilityWeights.get(end).get < state.reachabilityWeights.get(c).get)))
+//                }
+//
+//                if (ors.nonEmpty) {
+//                    terms.append(ClauseDeclaration(((!(state.character.x == Integer(c.x)) || !(state.character.y == Integer(c.y))) && nodeStart) ==> Operations.multipleTermsApply(ors.toList, Or.FUNCTION_MULTIPLE)))
+//                }
+//            }
 
             terms.toList
         }
@@ -138,13 +141,13 @@ object EncoderReachabilityBoxes {
 
 class EncoderReachabilityBoxes(override val instance: InstanceSokoban, override val updatesCallback: ClassicPlannerUpdatesCallback) extends EncoderSokoban[StateReachabilityBoxes](instance, updatesCallback) {
 
-    val reachabilities = Map.empty[(State, State), Reachability]
+    val reachabilities = mutable.Map.empty[(State, State), Reachability]
 
     override def createState(number: Int): StateReachabilityBoxes = new StateReachabilityBoxes(number, instance)
 
     override def createActions(sT: StateReachabilityBoxes, sTPlus: StateReachabilityBoxes): immutable.Seq[Action[StateReachabilityBoxes, SokobanActionEnum]] = {
         val reachability = new Reachability(instance, sT.number)
-        reachabilities(sT, sTPlus) = reachability
+        reachabilities.put((sT, sTPlus), reachability)
 
         instance.boxes.indices.map(b => new ActionReachabilityBoxes(instance, sT, sTPlus, b, reachability).asInstanceOf[Action[StateReachabilityBoxes, SokobanActionEnum]])
     }

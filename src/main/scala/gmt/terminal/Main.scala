@@ -7,7 +7,7 @@ import gmt.planner.fixedPlanner.FixedPlannerResult.FixedPlannerResult
 import gmt.planner.planner.ClassicPlanner.ClassicPlannerUpdatesCallback
 import gmt.planner.solver.value.Value
 import gmt.solver.encoder_smt.EncoderSMT.StateSMT
-import gmt.solver.encoder_smt.{EncoderBasic, EncoderReachability}
+import gmt.solver.encoder_smt.{EncoderBasic, EncoderReachability, EncoderReachabilityFolding}
 import gmt.solver.{SokobanSolver, SolvedSokobanPlan, UnsolvedSokobanPlan}
 
 import scala.collection.mutable
@@ -85,6 +85,8 @@ object Main {
                 sokobanSolver.solve(new EncoderBasic(loadInstance(instancePath), TerminalPrinter), TerminalPrinter)
             case List("smt_reachability", instancePath) =>
                 sokobanSolver.solve(new EncoderReachability(loadInstance(instancePath), TerminalPrinter), TerminalPrinter)
+            case List("smt_reachability_folding", instancePath) =>
+                sokobanSolver.solve(new EncoderReachabilityFolding(loadInstance(instancePath), TerminalPrinter), TerminalPrinter)
             case _ =>
                 System.out.println("Unknown arguments")
                 sys.exit(0)

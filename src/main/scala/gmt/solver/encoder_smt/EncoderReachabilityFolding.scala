@@ -10,15 +10,14 @@ import gmt.planner.planner.ClassicPlanner._
 import gmt.planner.solver.value.Value
 import gmt.solver.PlanInvalidException
 import gmt.solver.encoder_smt.EncoderBasic.BoxActionBasic
-import gmt.solver.encoder_smt.EncoderReachability.{BoxActionReachability, StateReachability}
+import gmt.solver.encoder_smt.EncoderReachabilityFolding.{BoxActionReachability, StateReachability}
 import gmt.solver.encoder_smt.EncoderSMT.{InstanceSMT, StateSMT}
 import gmt.util.AStar
 
 import scala.collection.immutable
 import scala.collection.mutable.ListBuffer
 
-
-object EncoderReachability {
+object EncoderReachabilityFolding {
 
     class StateReachability(override val number: Int, override val instance: InstanceSokoban) extends StateSMT(number, instance) {
         val reachabilityNodes: SortedMap[Coordinate, Variable] = SortedMap.empty[Coordinate, Variable]
@@ -49,10 +48,6 @@ object EncoderReachability {
     }
 
     class BoxActionReachability(override val sokobanAction: SokobanActionEnum, instance: InstanceSMT, override val sT: StateReachability, override val sTPlus: StateSMT, override val box: Int) extends BoxActionBasic(sokobanAction, instance, sT, sTPlus, box) {
-
-        override protected def terms(): immutable.Seq[Term] = {
-            List(ClauseDeclaration(repetition == Integer(1)))
-        }
 
         override protected def preconditions(): immutable.Seq[Term] = {
             val pres = ListBuffer.empty[Term]
@@ -114,7 +109,7 @@ object EncoderReachability {
     }
 }
 
-class EncoderReachability(override val instance: InstanceSokoban, override val updatesCallback: ClassicPlannerUpdatesCallback) extends EncoderSMT[StateReachability](instance, updatesCallback) {
+class EncoderReachabilityFolding(override val instance: InstanceSokoban, override val updatesCallback: ClassicPlannerUpdatesCallback) extends EncoderSMT[StateReachability](instance, updatesCallback) {
 
     override def createState(number: Int): StateReachability = new StateReachability(number, instance)
 
