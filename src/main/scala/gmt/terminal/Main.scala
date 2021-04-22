@@ -1,6 +1,6 @@
 package gmt.terminal
 
-import java.io.File
+import java.io.{File, PrintWriter}
 
 import gmt.game.GameObject.{ALIGN, BOX, CHARACTER}
 import gmt.instance.InstanceSokoban
@@ -21,7 +21,7 @@ object Main {
 
         override def plannerUpdate: Option[Function[FixedPlannerResult, _]] = Some(plannerUpdatePrint)
 
-        override def stateDecoded = Some(stateDecodePrint)
+        override def stateDecoded: Option[(StateSMT, Map[String, Value]) => Unit] = Some(stateDecodePrint)
 
         def plannerUpdatePrint(fixedPlannerResult: FixedPlannerResult): Unit = {
             println("timesteps=" + fixedPlannerResult.timeSteps + " time=" + fixedPlannerResult.milliseconds)
@@ -60,14 +60,64 @@ object Main {
         println(fixedPlannerResult)
     }
 
-    def getSettings() = {
-        val settingsPath = new File(Main.getClass.getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getPath  + "/config"
+    def getSettings(): Settings = {
+        val settingsPath = new File(Main.getClass.getProtectionDomain.getCodeSource.getLocation.toURI).getPath  + "/sokoban_editor.config"
+        val file = new File(settingsPath)
+
+        if (!file.exists()) {
+            val p = new PrintWriter(file)
+            p.write("yices2_path=\n")
+            p.close()
+
+            System.out.println("Settings file not found. File created at " + settingsPath + ".")
+        }
+
         val source = Source.fromFile(settingsPath)
         val lines = try source.mkString finally source.close()
         Settings.from(lines)
     }
 
     def main(args: Array[String]): Unit = {
+        args.toList match {
+            case List("-h") | List("--help") =>
+                System.out.println(
+                    """Solve Sokoban levels optimally.
+                      |
+                      |The editor uses Yices 2 as a SMT solver. The path to this solver is set in the
+                      |sokoban_editor.config file located in the same directory as sokoban_editor.jar.
+                      |
+                      |Usage: java -jar snowman_editor.jar -h | --help
+                      |
+                      |              Show this message.
+                      |
+                      |Usage: java -jar sokoban_editor.jar <mode> <level_path>
+                      |
+                      |<mode>:
+                      |
+                      |    smt_basic
+                      |
+                      |         Solve a given level minimizing the character + box movements.
+                      |
+                      |    smt_reachability
+                      |
+                      |         Solve a given level minimizing box movements.
+                      |
+                      |    smt_reachability_folding
+                      |
+                      |        Solve a given level minimizing change of directions of box movements. A box movement of n
+                      |        positions in a straight line has a cost of 1.
+                      |
+                      |<level_path>:
+                      |
+                      |        Path to the Sokoban level.
+                      |
+                      |""".stripMargin)
+                
+                sys.exit(0)
+
+            case _ =>
+        }
+
         val startTime = System.currentTimeMillis()
 
         val settings = getSettings()
@@ -76,7 +126,7 @@ object Main {
             case Some(s) =>
                 s
             case None =>
-                System.out.println("Yices2 path must be defined in settings")
+                System.out.println("Yices 2 path must be defined in settings")
                 sys.exit(1)
         }
 
@@ -91,7 +141,7 @@ object Main {
                 sokobanSolver.solve(new EncoderReachabilityFolding(loadInstance(instancePath), TerminalPrinter), TerminalPrinter)
             case _ =>
                 System.out.println("Unknown arguments")
-                sys.exit(0)
+                sys.exit(1)
         }
 
         print("\n")
@@ -110,6 +160,9 @@ object Main {
     }
 
     private def loadInstance(instancePath: String): InstanceSokoban = {
-        InstanceSokoban.load(Source.fromFile(instancePath).mkString)
+        val source = Source.fromFile(instancePath)
+        val string = source.mkString
+        source.close()
+        InstanceSokoban.load(string)
     }
 }
