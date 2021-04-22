@@ -5,7 +5,7 @@ The Sokoban Editor is a planning as satisfiability solver for Sokoban. It based 
 The editor can solve a given level ***optimally*** using the Yices SMT.
 
 ## Installation
-Download the latest version from the [release page](https://github.com/GerardMT/Sokoban-Editor/releases) or [build](https://github.com/GerardMT/Sokoban-Editor##build) the project.
+Download the latest version from the [release page](https://github.com/GerardMT/Sokoban-Editor/releases) or [build](https://github.com/GerardMT/Sokoban-Editor#build) the project.
 
 The editor requires at least Java SE 11. 
 
