@@ -11,9 +11,10 @@ lazy val sokoban_editor = (project in file("."))
     .aggregate(planner)
     .dependsOn(planner)
 
-
 lazy val planner = RootProject(file("./planner/"))
 
 Compile /  mainClass := Some("gmt.terminal.Main")
 
 Compile / packageBin / artifactPath := baseDirectory.value / "out" / "sokoban_editor.jar"
+
+assemblyOutputPath in assembly := file("out/sokoban_editor.jar")
